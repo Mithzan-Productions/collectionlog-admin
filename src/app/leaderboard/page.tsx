@@ -1,5 +1,6 @@
 import { Trophy } from "lucide-react";
 import { leaderboard } from "@/db/queries";
+import { isMock } from "@/db/client";
 import { LeaderboardTable } from "./leaderboard-table";
 
 export const dynamic = "force-dynamic";
@@ -38,7 +39,7 @@ export default async function LeaderboardPage() {
           no ranked players yet.
         </div>
       ) : (
-        <LeaderboardTable rows={rows} />
+        <LeaderboardTable rows={rows} isMock={isMock} />
       )}
     </div>
   );
