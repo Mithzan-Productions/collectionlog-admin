@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { Search, UserRound, Loader2 } from "lucide-react";
+import { Search, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { PlayerHead } from "@/components/player-head";
 import { searchPlayersAction } from "./actions";
 import type { PlayerListRow } from "@/db/queries";
 
@@ -82,7 +83,7 @@ export function PlayerSearch({ initial }: { initial: PlayerListRow[] }) {
                   {query.trim() ? (
                     <>No players match <span className="font-mono">{query}</span>.</>
                   ) : (
-                    <>No players found. Run <code className="font-mono text-[var(--color-accent-2)]">pnpm db:seed</code> to populate.</>
+                    <>No players found.</>
                   )}
                 </td>
               </tr>
@@ -97,9 +98,9 @@ export function PlayerSearch({ initial }: { initial: PlayerListRow[] }) {
                   <td className="px-4 py-3">
                     <Link
                       href={`/players/${p.uuid}` as Route}
-                      className="group inline-flex items-center gap-2 font-medium text-[var(--color-fg)] hover:text-[var(--color-accent)]"
+                      className="group inline-flex items-center gap-3 font-medium text-[var(--color-fg)] hover:text-[var(--color-accent)]"
                     >
-                      <UserRound className="h-4 w-4 text-[var(--color-fg-muted)] transition-colors group-hover:text-[var(--color-accent)]" />
+                      <PlayerHead name={p.name} size={28} />
                       <span>{p.name ?? "(unnamed)"}</span>
                     </Link>
                   </td>

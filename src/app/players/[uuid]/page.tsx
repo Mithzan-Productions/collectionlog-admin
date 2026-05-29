@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Clock, Hash, Sparkles, UserRound } from "lucide-react";
+import { ArrowLeft, Clock, Hash, Sparkles } from "lucide-react";
 import {
   getPlayer,
   isOnline,
@@ -9,8 +9,9 @@ import {
   progressByCollection,
 } from "@/db/queries";
 import { Badge } from "@/components/ui/badge";
-import { ColoredText } from "@/components/colored-text";
+import { PlayerHead } from "@/components/player-head";
 import { GrantPanel } from "./grant-panel";
+import { ProgressSection } from "./progress-section";
 
 export const dynamic = "force-dynamic";
 
@@ -61,9 +62,7 @@ export default async function PlayerDetailPage({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-2">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded border bg-[var(--color-panel-2)]">
-                <UserRound className="h-5 w-5 text-[var(--color-fg-muted)]" />
-              </div>
+              <PlayerHead name={holder.name} size={48} />
               <div>
                 <h1 className="text-xl font-semibold leading-tight">{holder.name}</h1>
                 <div className="mt-0.5 flex items-center gap-1.5 font-mono text-xs text-[var(--color-fg-muted)]">
@@ -118,55 +117,13 @@ export default async function PlayerDetailPage({
           <Sparkles className="h-4 w-4 text-[var(--color-accent)]" />
           Progress
         </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {progress.map((row) => {
-            const granted = Number(row.granted ?? 0);
-            const total = Number(row.total ?? 0);
-            const pct = total === 0 ? 0 : Math.round((granted / total) * 100);
-            const complete = total > 0 && granted >= total;
-            return (
-              <div
-                key={row.collection_id}
-                className="rounded border bg-[var(--color-panel)] p-4 transition-colors hover:bg-[var(--color-panel-2)]"
-              >
-                <div className="mb-2 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate font-medium">
-                      <ColoredText
-                        raw={row.display_name_raw}
-                        fallback={row.display_name_plain}
-                      />
-                    </div>
-                    <div className="truncate font-mono text-[10px] text-[var(--color-fg-muted)]">
-                      {row.collection_id}
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <div className="font-mono text-xs text-[var(--color-fg-muted)]">
-                      {granted}/{total}
-                    </div>
-                    <div
-                      className={
-                        "font-mono text-sm font-semibold " +
-                        (complete
-                          ? "text-[var(--color-accent-2)]"
-                          : "text-[var(--color-accent)]")
-                      }
-                    >
-                      {pct}%
-                    </div>
-                  </div>
-                </div>
-                <ProgressBar pct={pct} complete={complete} />
-              </div>
-            );
-          })}
-          {progress.length === 0 && (
-            <div className="col-span-full rounded border border-dashed bg-[var(--color-panel)] px-4 py-8 text-center text-sm text-[var(--color-fg-muted)]">
-              No collections found in the catalog.
-            </div>
-          )}
-        </div>
+        {progress.length === 0 ? (
+          <div className="border border-dashed border-[var(--color-rule-2)] bg-[var(--color-paper)] px-4 py-8 text-center font-mono text-sm text-[var(--color-fg-muted)]">
+            No collections found in the catalog.
+          </div>
+        ) : (
+          <ProgressSection rows={progress} />
+        )}
       </section>
 
       {/* Grant / revoke section */}

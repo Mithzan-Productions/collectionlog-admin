@@ -44,8 +44,7 @@ export default async function CatalogPage() {
       {/* ─── Filterable collection list ───────────────────────────────── */}
       {collections.length === 0 ? (
         <div className="border border-dashed border-[var(--color-rule-2)] bg-[var(--color-paper)] px-4 py-10 text-center font-mono text-sm text-[var(--color-fg-muted)]">
-          no collections seeded. run{" "}
-          <code className="font-mono text-[var(--color-lime)]">pnpm db:seed</code>.
+          no collections found. waiting for the plugin to sync its catalog.
         </div>
       ) : (
         <div className="settle" style={{ animationDelay: "200ms" }}>

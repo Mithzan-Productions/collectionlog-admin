@@ -174,16 +174,19 @@ export async function entriesForGrantingCollection(collectionId: string) {
     .where(eq(catalogEntries.collectionId, collectionId));
 }
 
-export async function progressByCollection(uuid: string) {
+export type ProgressRow = {
+  collection_id: string;
+  display_name_plain: string;
+  display_name_raw: string | null;
+  menu_icon: string | null;
+  type: string | null;
+  granted: number;
+  total: number;
+};
+
+export async function progressByCollection(uuid: string): Promise<ProgressRow[]> {
   const ns = NAMESPACE;
-  const rows = await rawQuery<{
-    collection_id: string;
-    display_name_plain: string;
-    display_name_raw: string | null;
-    menu_icon: string | null;
-    granted: number;
-    total: number;
-  }>(
+  const rows = await rawQuery<ProgressRow>(
     `WITH granted AS (
        SELECT (e->>'collectionId') AS collection_id, COUNT(*)::int AS granted
          FROM player_data p,
@@ -200,6 +203,7 @@ export async function progressByCollection(uuid: string) {
             c.display_name_plain,
             c.display_name_raw,
             c.menu_icon,
+            c.type,
             COALESCE(g.granted, 0) AS granted,
             COALESCE(t.total, 0)   AS total
        FROM catalog_collections c

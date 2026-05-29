@@ -54,7 +54,9 @@ export default async function Home() {
           <div className="ticket settle" style={{ animationDelay: "150ms" }}>
             <div className="flex items-center justify-between border-b border-dashed border-[var(--color-rule-2)] px-4 py-2">
               <span className="label-tiny">snapshot</span>
-              <span className="font-mono text-[10px] text-[var(--color-fg-dim)]">mock.db</span>
+              <span className="font-mono text-[10px] text-[var(--color-fg-dim)]">
+                {isMock ? "mock.db" : "live"}
+              </span>
             </div>
             <dl className="divide-y divide-dashed divide-[var(--color-rule-2)]">
               <Row k="collections" v={s.collections} />
