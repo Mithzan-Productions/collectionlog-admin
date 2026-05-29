@@ -22,6 +22,7 @@ import {
   grantAction,
   grantCollectionAction,
   revokeAction,
+  revokeCollectionAction,
   searchAction,
   type EntryKey,
 } from "./actions";
@@ -47,6 +48,7 @@ function keyOf(e: { identifier: string; collection_id?: string; collectionId?: s
 type ConfirmKind =
   | { type: "grant"; entries: EntryKey[]; label: string }
   | { type: "grantCollection"; collectionId: string; label: string }
+  | { type: "revokeCollection"; collectionId: string; label: string }
   | { type: "revoke"; entries: EntryKey[]; label: string };
 
 export function GrantPanel({
@@ -148,6 +150,16 @@ export function GrantPanel({
     });
   };
 
+  const askRevokeCollection = () => {
+    if (!collectionId) return;
+    const c = collections.find((c) => c.identifier === collectionId);
+    setConfirm({
+      type: "revokeCollection",
+      collectionId,
+      label: c?.displayNamePlain ?? collectionId,
+    });
+  };
+
   const askRevoke = (row: GrantedEntryRow) => {
     setConfirm({
       type: "revoke",
@@ -178,6 +190,16 @@ export function GrantPanel({
                   message: `Granted ${granted} entr${granted === 1 ? "y" : "ies"} from ${c.label}.`,
                 }
               : { kind: "info", message: `${c.label} was already complete for this player.` },
+          );
+        } else if (c.type === "revokeCollection") {
+          const { revoked } = await revokeCollectionAction(uuid, c.collectionId);
+          setToast(
+            revoked > 0
+              ? {
+                  kind: "success",
+                  message: `Revoked ${revoked} entr${revoked === 1 ? "y" : "ies"} from ${c.label}.`,
+                }
+              : { kind: "info", message: `Nothing to revoke from ${c.label}.` },
           );
         } else if (c.type === "revoke") {
           const { revoked } = await revokeAction(uuid, c.entries);
@@ -314,24 +336,27 @@ export function GrantPanel({
         </div>
       </div>
 
-      {/* Grant entire collection */}
-      <div className="space-y-3 rounded border bg-[var(--color-panel)] p-4">
+      {/* Grant / revoke entire collection */}
+      <div className="space-y-3 border border-[var(--color-rule-2)] bg-[var(--color-paper)] p-4">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Layers className="h-4 w-4 text-[var(--color-fg-muted)]" />
-          Grant entire collection
+          Whole collection
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <select
-            value={collectionId}
-            onChange={(e) => setCollectionId(e.target.value)}
-            className="h-9 flex-1 rounded border bg-[var(--color-panel-2)] px-3 text-sm text-[var(--color-fg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+        <CollectionCombobox
+          collections={collections}
+          value={collectionId}
+          onChange={setCollectionId}
+        />
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button
+            variant="danger"
+            disabled={!collectionId || mutationPending}
+            onClick={askRevokeCollection}
+            className="gap-1.5"
           >
-            {collections.map((c) => (
-              <option key={c.identifier} value={c.identifier}>
-                {c.displayNamePlain} ({c.identifier})
-              </option>
-            ))}
-          </select>
+            <Trash2 className="h-4 w-4" />
+            Revoke collection
+          </Button>
           <Button
             variant="secondary"
             disabled={!collectionId || mutationPending}
@@ -342,8 +367,8 @@ export function GrantPanel({
             Grant collection
           </Button>
         </div>
-        <p className="text-xs text-[var(--color-fg-muted)]">
-          Dedup-safe — already granted entries are skipped on the DB side.
+        <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--color-fg-dim)]">
+          Both operations are dedup-safe — only what needs to change does.
         </p>
       </div>
 
@@ -413,7 +438,9 @@ export function GrantPanel({
             aria-modal="true"
           >
             <h2 className="mb-1 text-base font-semibold">
-              {confirm.type === "revoke" ? "Revoke entry?" : "Confirm grant"}
+              {confirm.type === "revoke" || confirm.type === "revokeCollection"
+                ? "Confirm revoke"
+                : "Confirm grant"}
             </h2>
             <p className="mb-5 text-sm text-[var(--color-fg-muted)]">
               {confirm.type === "grant" && (
@@ -426,6 +453,12 @@ export function GrantPanel({
                 <>
                   About to grant every entry in <span className="font-medium text-[var(--color-fg)]">{confirm.label}</span>{" "}
                   to <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
+                </>
+              )}
+              {confirm.type === "revokeCollection" && (
+                <>
+                  About to revoke every entry in <span className="font-medium text-[var(--color-fg)]">{confirm.label}</span>{" "}
+                  from <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
                 </>
               )}
               {confirm.type === "revoke" && (
@@ -444,15 +477,177 @@ export function GrantPanel({
                 Cancel
               </Button>
               <Button
-                variant={confirm.type === "revoke" ? "danger" : "default"}
+                variant={
+                  confirm.type === "revoke" || confirm.type === "revokeCollection"
+                    ? "danger"
+                    : "default"
+                }
                 disabled={mutationPending}
                 onClick={runConfirmed}
                 className="gap-1.5"
               >
                 {mutationPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {confirm.type === "revoke" ? "Revoke" : "Grant"}
+                {confirm.type === "revoke" || confirm.type === "revokeCollection"
+                  ? "Revoke"
+                  : "Grant"}
               </Button>
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Fuzzy combobox for picking a collection (scales to hundreds) ────────────
+function CollectionCombobox({
+  collections,
+  value,
+  onChange,
+}: {
+  collections: CollectionOption[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIdx, setActiveIdx] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const current = collections.find((c) => c.identifier === value);
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    if (!q) return collections;
+    return collections.filter(
+      (c) =>
+        c.displayNamePlain.toLowerCase().includes(q) ||
+        c.identifier.toLowerCase().includes(q),
+    );
+  }, [collections, query]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+
+  // Reset active index when filter changes
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [query, open]);
+
+  const commit = (id: string) => {
+    onChange(id);
+    setOpen(false);
+    setQuery("");
+  };
+
+  return (
+    <div ref={rootRef} className="relative">
+      {!open ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="flex h-10 w-full items-center justify-between border border-[var(--color-rule-2)] bg-[var(--color-ink)] px-3 text-left font-mono text-sm transition hover:border-[var(--color-lime)]/60"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="label-tiny text-[var(--color-lime-dim)]">/</span>
+            {current ? (
+              <span className="min-w-0 truncate">
+                <ColoredText raw={current.displayNameRaw} fallback={current.displayNamePlain} />
+              </span>
+            ) : (
+              <span className="text-[var(--color-fg-dim)]">pick a collection…</span>
+            )}
+          </span>
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[var(--color-fg-dim)]">
+            {collections.length} ▾
+          </span>
+        </button>
+      ) : (
+        <div className="border border-[var(--color-lime)]/50 bg-[var(--color-ink)]">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-fg-dim)]" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown") {
+                  e.preventDefault();
+                  setActiveIdx((i) => Math.min(i + 1, filtered.length - 1));
+                } else if (e.key === "ArrowUp") {
+                  e.preventDefault();
+                  setActiveIdx((i) => Math.max(0, i - 1));
+                } else if (e.key === "Enter") {
+                  e.preventDefault();
+                  const c = filtered[activeIdx];
+                  if (c) commit(c.identifier);
+                } else if (e.key === "Escape") {
+                  e.preventDefault();
+                  setOpen(false);
+                  setQuery("");
+                }
+              }}
+              placeholder="search collections…"
+              className="h-10 w-full border-b border-dashed border-[var(--color-rule-2)] bg-transparent pl-9 pr-3 font-mono text-sm text-[var(--color-fg)] placeholder:text-[var(--color-fg-dim)] focus:outline-none"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-6 text-center font-mono text-xs text-[var(--color-fg-dim)]">
+                no match for{" "}
+                <span className="text-[var(--color-fg-muted)]">{query}</span>
+              </div>
+            ) : (
+              filtered.map((c, i) => {
+                const isActive = i === activeIdx;
+                const isCurrent = c.identifier === value;
+                return (
+                  <button
+                    key={c.identifier}
+                    type="button"
+                    onMouseEnter={() => setActiveIdx(i)}
+                    onClick={() => commit(c.identifier)}
+                    className={
+                      "flex w-full items-center gap-3 border-b border-dashed border-[var(--color-rule)] px-3 py-2 text-left text-sm last:border-b-0 " +
+                      (isActive ? "bg-[var(--color-paper-2)]" : "")
+                    }
+                  >
+                    <span
+                      className={
+                        "glyph font-mono text-xs " +
+                        (isCurrent
+                          ? "text-[var(--color-lime)]"
+                          : isActive
+                            ? "text-[var(--color-fg-muted)]"
+                            : "text-[var(--color-fg-dim)]")
+                      }
+                    >
+                      {isCurrent ? "[*]" : isActive ? "[›]" : "[ ]"}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">
+                      <ColoredText raw={c.displayNameRaw} fallback={c.displayNamePlain} />
+                    </span>
+                    <span className="hidden truncate font-mono text-[10px] text-[var(--color-fg-dim)] sm:inline">
+                      {c.identifier}
+                    </span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          <div className="flex items-center justify-between border-t border-dashed border-[var(--color-rule-2)] px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.18em] text-[var(--color-fg-dim)]">
+            <span>{filtered.length} of {collections.length}</span>
+            <span>↑↓ navigate · ↵ select · esc close</span>
           </div>
         </div>
       )}

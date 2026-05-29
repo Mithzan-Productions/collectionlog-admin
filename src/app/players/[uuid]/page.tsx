@@ -205,7 +205,7 @@ function ProgressBar({ pct, complete }: { pct: number; complete?: boolean }) {
         className="h-full transition-[width] duration-500"
         style={{
           width: `${clamped}%`,
-          background: color,
+          backgroundColor: color,
           backgroundImage:
             "repeating-linear-gradient(90deg, transparent 0 9px, rgba(13,12,10,0.45) 9px 10px)",
         }}

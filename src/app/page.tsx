@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { rawQuery } from "@/db/client";
 
+// DB-backed — never prerender at build time
+export const dynamic = "force-dynamic";
+
 async function summary() {
   const [c] = await rawQuery<{ n: string }>(`SELECT COUNT(*)::text AS n FROM catalog_collections`);
   const [e] = await rawQuery<{ n: string }>(`SELECT COUNT(*)::text AS n FROM catalog_entries`);

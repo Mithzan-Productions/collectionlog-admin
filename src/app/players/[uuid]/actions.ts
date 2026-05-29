@@ -30,6 +30,12 @@ export async function grantCollectionAction(uuid: string, collectionId: string) 
   return grantAction(uuid, entries);
 }
 
+export async function revokeCollectionAction(uuid: string, collectionId: string) {
+  // Pass every catalog entry — revoke_entries is a no-op for ones not on the holder.
+  const entries = await entriesForGrantingCollection(collectionId);
+  return revokeAction(uuid, entries);
+}
+
 export async function searchAction(q: string) {
   return searchEntries(q, 50);
 }
