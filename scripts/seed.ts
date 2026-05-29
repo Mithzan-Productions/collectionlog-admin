@@ -74,18 +74,39 @@ function lerpHex(a: string, b: string, t: number): string {
 }
 
 const COLLECTIONS = [
-  { id: "mining_basics",       name: "Mining Basics",        icon: "DIAMOND_PICKAXE", type: "NORMAL" },
-  { id: "boss_drops",          name: "Boss Drops",           icon: "NETHER_STAR",     type: "NORMAL" },
-  { id: "fishing_haul",        name: "Fishing Haul",         icon: "FISHING_ROD",     type: "NORMAL" },
-  { id: "advanced_collection", name: "Advanced Collection",  icon: "PAPER",           type: "NORMAL" },
-  { id: "rare_finds",          name: "Rare Finds",           icon: "ENCHANTED_BOOK",  type: "NORMAL" },
-  { id: "halloween_2026",      name: "Halloween 2026",       icon: "JACK_O_LANTERN",  type: "EVENT" },
-  { id: "trinkets",            name: "Trinkets",             icon: "AMETHYST_SHARD",  type: "NORMAL" },
-  { id: "weapons_master",      name: "Weapons Master",       icon: "NETHERITE_SWORD", type: "NORMAL" },
-  { id: "armor_anthology",     name: "Armor Anthology",      icon: "DIAMOND_CHESTPLATE", type: "NORMAL" },
-  { id: "potion_brewer",       name: "Potion Brewer",        icon: "BREWING_STAND",   type: "NORMAL" },
-  { id: "food_critic",         name: "Food Critic",          icon: "GOLDEN_APPLE",    type: "NORMAL" },
-  { id: "wandering_trader",    name: "Wandering Trader",     icon: "EMERALD",         type: "SECRET" },
+  // ── NORMAL ────────────────────────────────────────────────────────────────
+  { id: "mining_basics",       name: "Mining Basics",        icon: "DIAMOND_PICKAXE",   type: "NORMAL" },
+  { id: "boss_drops",          name: "Boss Drops",           icon: "NETHER_STAR",       type: "NORMAL" },
+  { id: "fishing_haul",        name: "Fishing Haul",         icon: "FISHING_ROD",       type: "NORMAL" },
+  { id: "advanced_collection", name: "Advanced Collection",  icon: "PAPER",             type: "NORMAL" },
+  { id: "rare_finds",          name: "Rare Finds",           icon: "ENCHANTED_BOOK",    type: "NORMAL" },
+  { id: "trinkets",            name: "Trinkets",             icon: "AMETHYST_SHARD",    type: "NORMAL" },
+  { id: "weapons_master",      name: "Weapons Master",       icon: "NETHERITE_SWORD",   type: "NORMAL" },
+  { id: "armor_anthology",     name: "Armor Anthology",      icon: "DIAMOND_CHESTPLATE",type: "NORMAL" },
+  { id: "potion_brewer",       name: "Potion Brewer",        icon: "BREWING_STAND",     type: "NORMAL" },
+  { id: "food_critic",         name: "Food Critic",          icon: "GOLDEN_APPLE",      type: "NORMAL" },
+  { id: "exploration",         name: "Exploration",          icon: "COMPASS",           type: "NORMAL" },
+  { id: "enchanting_lore",     name: "Enchanting Lore",      icon: "ENCHANTING_TABLE",  type: "NORMAL" },
+  { id: "farming",             name: "Farming",              icon: "WHEAT",             type: "NORMAL" },
+  { id: "building_blocks",     name: "Building Blocks",      icon: "BRICKS",            type: "NORMAL" },
+  { id: "tools_of_trade",      name: "Tools of the Trade",   icon: "ANVIL",             type: "NORMAL" },
+  { id: "deep_dark",           name: "Deep Dark Expedition", icon: "ECHO_SHARD",        type: "NORMAL" },
+
+  // ── PRESTIGE ──────────────────────────────────────────────────────────────
+  { id: "mining_prestige",     name: "Mining Prestige",      icon: "NETHERITE_PICKAXE", type: "PRESTIGE" },
+  { id: "boss_drops_prestige", name: "Boss Drops Prestige",  icon: "DRAGON_HEAD",       type: "PRESTIGE" },
+  { id: "fishing_prestige",    name: "Fishing Prestige",     icon: "PUFFERFISH",        type: "PRESTIGE" },
+  { id: "weapons_prestige",    name: "Weapons Prestige",     icon: "MACE",              type: "PRESTIGE" },
+  { id: "armor_prestige",      name: "Armor Prestige",       icon: "NETHERITE_CHESTPLATE", type: "PRESTIGE" },
+
+  // ── EVENT ─────────────────────────────────────────────────────────────────
+  { id: "halloween_2026",      name: "Halloween 2026",       icon: "JACK_O_LANTERN",    type: "EVENT" },
+  { id: "winter_2026",         name: "Winter Festival 2026", icon: "SNOWBALL",          type: "EVENT" },
+  { id: "summer_2026",         name: "Summer Splash 2026",   icon: "TROPICAL_FISH",     type: "EVENT" },
+
+  // ── SECRET ────────────────────────────────────────────────────────────────
+  { id: "wandering_trader",    name: "Wandering Trader",     icon: "EMERALD",           type: "SECRET" },
+  { id: "hidden_caches",       name: "Hidden Caches",        icon: "BUNDLE",            type: "SECRET" },
 ];
 
 const MATERIALS = [

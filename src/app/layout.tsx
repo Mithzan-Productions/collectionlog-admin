@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Big_Shoulders_Display, Fragment_Mono } from "next/font/google";
+import { Big_Shoulders, Fragment_Mono } from "next/font/google";
 import "./globals.css";
 
-const display = Big_Shoulders_Display({
+const display = Big_Shoulders({
   subsets: ["latin"],
   weight: ["700", "800", "900"],
   variable: "--font-display",
