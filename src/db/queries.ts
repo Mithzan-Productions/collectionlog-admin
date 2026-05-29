@@ -1,0 +1,171 @@
+/**
+ * Query helpers. Keep all SQL in this file so server components stay clean.
+ */
+import { db, rawQuery, NAMESPACE } from "./client";
+import { catalogCollections, catalogEntries, playerData, type LogHolder } from "./schema";
+import { eq, asc } from "drizzle-orm";
+
+// ─── catalog ─────────────────────────────────────────────────────────────────
+export async function listCollections() {
+  return db.select().from(catalogCollections).orderBy(asc(catalogCollections.menuWeight));
+}
+
+export async function getCollection(id: string) {
+  const rows = await db
+    .select()
+    .from(catalogCollections)
+    .where(eq(catalogCollections.identifier, id));
+  return rows[0] ?? null;
+}
+
+export async function listEntriesForCollection(collectionId: string) {
+  return db
+    .select()
+    .from(catalogEntries)
+    .where(eq(catalogEntries.collectionId, collectionId))
+    .orderBy(asc(catalogEntries.menuWeight));
+}
+
+/**
+ * Fuzzy search over entry names. Uses pg_trgm similarity.
+ */
+export async function searchEntries(query: string, limit = 50) {
+  if (!query.trim()) return [];
+  const q = query.toLowerCase().trim();
+  // Substring match (ILIKE) catches everything a user expects; word_similarity
+  // ranks fuzzy/typo matches. Both go through the gin_trgm index.
+  const rows = await rawQuery<{
+    identifier: string;
+    collection_id: string;
+    display_name_plain: string;
+    display_name_raw: string | null;
+    material: string | null;
+    score: number;
+  }>(
+    `SELECT identifier, collection_id, display_name_plain, display_name_raw, material,
+            GREATEST(
+              word_similarity($1, search_text),
+              CASE WHEN search_text ILIKE '%' || $1 || '%' THEN 1.0 ELSE 0 END
+            ) AS score
+       FROM catalog_entries
+      WHERE search_text ILIKE '%' || $1 || '%'
+         OR word_similarity($1, search_text) > 0.3
+      ORDER BY score DESC, display_name_plain ASC
+      LIMIT $2`,
+    [q, limit],
+  );
+  return rows;
+}
+
+// ─── players ─────────────────────────────────────────────────────────────────
+export type PlayerListRow = {
+  uuid: string;
+  name: string;
+  entry_count: number;
+  updated_at: string;
+};
+
+export async function listPlayers(searchName?: string, limit = 100): Promise<PlayerListRow[]> {
+  const ns = NAMESPACE;
+  const params: unknown[] = [ns, limit];
+  let whereClause = "";
+  if (searchName?.trim()) {
+    whereClause = "AND lower(data->$1->>'name') LIKE $3";
+    params.push(`%${searchName.toLowerCase()}%`);
+  }
+  const rows = await rawQuery<PlayerListRow>(
+    `SELECT uuid::text AS uuid,
+            data->$1->>'name' AS name,
+            COALESCE(jsonb_array_length(data->$1->'entries'), 0)::int AS entry_count,
+            updated_at::text AS updated_at
+       FROM player_data
+      WHERE data ? $1 ${whereClause}
+      ORDER BY name ASC NULLS LAST
+      LIMIT $2`,
+    params,
+  );
+  return rows;
+}
+
+export async function getPlayer(uuid: string): Promise<LogHolder | null> {
+  const rows = await db
+    .select({ data: playerData.data })
+    .from(playerData)
+    .where(eq(playerData.uuid, uuid));
+  if (rows.length === 0) return null;
+  const ns = (rows[0].data as Record<string, unknown>)[NAMESPACE];
+  return (ns as LogHolder) ?? null;
+}
+
+// ─── mutations (call the SQL functions) ──────────────────────────────────────
+export async function grantEntries(
+  uuid: string,
+  entries: { identifier: string; collectionId: string }[],
+): Promise<number> {
+  const result = await rawQuery<{ grant_entries: number }>(
+    `SELECT grant_entries($1::uuid, $2::text, $3::jsonb) AS grant_entries`,
+    [uuid, NAMESPACE, JSON.stringify(entries)],
+  );
+  return result[0]?.grant_entries ?? 0;
+}
+
+export async function revokeEntries(
+  uuid: string,
+  entries: { identifier: string; collectionId: string }[],
+): Promise<number> {
+  const result = await rawQuery<{ revoke_entries: number }>(
+    `SELECT revoke_entries($1::uuid, $2::text, $3::jsonb) AS revoke_entries`,
+    [uuid, NAMESPACE, JSON.stringify(entries)],
+  );
+  return result[0]?.revoke_entries ?? 0;
+}
+
+export async function entriesForGrantingCollection(collectionId: string) {
+  return db
+    .select({ identifier: catalogEntries.identifier, collectionId: catalogEntries.collectionId })
+    .from(catalogEntries)
+    .where(eq(catalogEntries.collectionId, collectionId));
+}
+
+export async function progressByCollection(uuid: string) {
+  const ns = NAMESPACE;
+  const rows = await rawQuery<{
+    collection_id: string;
+    display_name_plain: string;
+    display_name_raw: string | null;
+    menu_icon: string | null;
+    granted: number;
+    total: number;
+  }>(
+    `WITH granted AS (
+       SELECT (e->>'collectionId') AS collection_id, COUNT(*)::int AS granted
+         FROM player_data p,
+              jsonb_array_elements(COALESCE(p.data->$1->'entries', '[]'::jsonb)) e
+        WHERE p.uuid = $2::uuid
+        GROUP BY 1
+     ),
+     totals AS (
+       SELECT collection_id, COUNT(*)::int AS total
+         FROM catalog_entries
+        GROUP BY 1
+     )
+     SELECT c.identifier AS collection_id,
+            c.display_name_plain,
+            c.display_name_raw,
+            c.menu_icon,
+            COALESCE(g.granted, 0) AS granted,
+            COALESCE(t.total, 0)   AS total
+       FROM catalog_collections c
+       LEFT JOIN granted g ON g.collection_id = c.identifier
+       LEFT JOIN totals  t ON t.collection_id = c.identifier
+      ORDER BY c.menu_weight ASC NULLS LAST, c.display_name_plain ASC`,
+    [ns, uuid],
+  );
+  return rows;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export async function isOnline(uuid: string): Promise<boolean> {
+  // In prod we'd check Redis or a `players_online` projection. Always false in mock.
+  return false;
+}

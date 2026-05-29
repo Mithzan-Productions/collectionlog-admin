@@ -1,0 +1,19 @@
+node_modules/
+.next/
+out/
+dist/
+*.log
+.env
+.env.local
+.env*.local
+.DS_Store
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# local mock database (regenerate with pnpm db:seed)
+mock.db
+mock.db-*
+
+# generated contract types
+src/lib/contracts/*.generated.ts
