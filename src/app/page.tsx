@@ -70,22 +70,34 @@ export default async function Home() {
 
       <hr className="punchline" />
 
-      {/* ────── Quick lanes ────── */}
-      <section className="grid grid-cols-1 gap-px bg-[var(--color-rule-2)] md:grid-cols-2 settle" style={{ animationDelay: "240ms" }}>
+      {/* ────── Quick lanes (Leaderboard full-width, then Catalog + Players) ────── */}
+      <section
+        className="grid gap-px bg-[var(--color-rule-2)] settle"
+        style={{ animationDelay: "240ms" }}
+      >
         <Lane
-          href="/catalog"
-          code="C-01"
-          name="catalog"
-          desc="Trigram search across every entry. Browse by collection."
-          shortcut="g c"
+          href="/leaderboard"
+          code="L-01"
+          name="leaderboard"
+          desc="Ranked players by completed collections. Click any row to jump to their holder."
+          shortcut="g l"
         />
-        <Lane
-          href="/players"
-          code="P-01"
-          name="players"
-          desc="Inspect a holder. Grant collections. Revoke drops. Safe-by-default."
-          shortcut="g p"
-        />
+        <div className="grid gap-px bg-[var(--color-rule-2)] md:grid-cols-2">
+          <Lane
+            href="/catalog"
+            code="C-02"
+            name="catalog"
+            desc="Trigram search across every entry. Browse by collection."
+            shortcut="g c"
+          />
+          <Lane
+            href="/players"
+            code="P-03"
+            name="players"
+            desc="Inspect a holder. Grant collections. Revoke drops. Safe-by-default."
+            shortcut="g p"
+          />
+        </div>
       </section>
 
       {/* ────── Dev tape (hidden in prod) ────── */}

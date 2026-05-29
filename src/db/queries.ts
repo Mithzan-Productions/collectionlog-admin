@@ -283,3 +283,39 @@ export async function listCollectionsForPicker() {
     .from(catalogCollections)
     .orderBy(asc(catalogCollections.menuWeight));
 }
+
+export type LeaderboardRow = {
+  uuid: string;
+  name: string;
+  normal_logs: number;
+  prestige_logs: number;
+  entries: number;
+};
+
+/**
+ * Top players ranked by total_normal_logs (matches in-game /logstats).
+ *
+ * Source: `clr_log_stats` (owned by the CollectionLogReloaded plugin).
+ * Joins MCPlus's `player_data` to surface a third "entries granted" column.
+ *
+ * A player can appear in `clr_log_stats` without a corresponding `player_data`
+ * row (or vice-versa) — both joins are LEFT so neither side filters the other.
+ */
+export async function leaderboard(limit = 100): Promise<LeaderboardRow[]> {
+  const ns = NAMESPACE;
+  const rows = await rawQuery<LeaderboardRow>(
+    `SELECT s.player_id::text AS uuid,
+            s.player_name AS name,
+            s.total_normal_logs   AS normal_logs,
+            s.total_prestige_logs AS prestige_logs,
+            COALESCE(jsonb_array_length(p.data->$1->'entries'), 0)::int AS entries
+       FROM clr_log_stats s
+       LEFT JOIN player_data p ON p.uuid = s.player_id
+      ORDER BY s.total_normal_logs DESC,
+               s.total_prestige_logs DESC,
+               s.player_name ASC
+      LIMIT $2`,
+    [ns, limit],
+  );
+  return rows;
+}

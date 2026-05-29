@@ -45,8 +45,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </span>
               </Link>
               <nav className="flex items-stretch">
-                <NavLink href="/catalog" label="catalog" hint="C-01" />
-                <NavLink href="/players" label="players" hint="P-01" />
+                <NavLink href="/leaderboard" label="leaderboard" hint="L-01" />
+                <NavLink href="/catalog" label="catalog" hint="C-02" />
+                <NavLink href="/players" label="players" hint="P-03" />
               </nav>
               <div className="ml-auto flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-dim)]">
                 <span className="flex items-center gap-1.5">

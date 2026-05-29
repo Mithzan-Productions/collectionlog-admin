@@ -53,6 +53,16 @@ export const catalogEntries = pgTable(
   }),
 );
 
+// ─── CollectionLogReloaded plugin's leaderboard table (read-only) ────────────
+// Owned by the plugin (SqlStatProvider). We never write here.
+export const clrLogStats = pgTable("clr_log_stats", {
+  id: serial("id").primaryKey(),
+  playerId: uuid("player_id").notNull().unique(),
+  playerName: text("player_name").notNull(),
+  totalNormalLogs: integer("total_normal_logs").notNull().default(0),
+  totalPrestigeLogs: integer("total_prestige_logs").notNull().default(0),
+});
+
 // ─── Dev-only message log (PGlite) ───────────────────────────────────────────
 export const devMessagebusLog = pgTable("dev_messagebus_log", {
   id: serial("id").primaryKey(),

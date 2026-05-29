@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS catalog_entries (
 CREATE INDEX IF NOT EXISTS catalog_entries_search_idx
   ON catalog_entries USING gin (search_text gin_trgm_ops);
 
+-- Owned by the CollectionLogReloaded plugin (SqlStatProvider).
+-- Declared here so PGlite (mock dev) has it. In prod the plugin already creates it.
+CREATE TABLE IF NOT EXISTS clr_log_stats (
+  id                   SERIAL PRIMARY KEY,
+  player_id            UUID NOT NULL UNIQUE,
+  player_name          TEXT NOT NULL,
+  total_normal_logs    INTEGER NOT NULL DEFAULT 0,
+  total_prestige_logs  INTEGER NOT NULL DEFAULT 0
+);
+
 -- Dev-only: messagebus log for inspecting what the website would publish
 CREATE TABLE IF NOT EXISTS dev_messagebus_log (
   id         SERIAL PRIMARY KEY,

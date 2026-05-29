@@ -205,18 +205,40 @@ async function seed() {
     }
   }
 
+  // Type lookup for each collection (NORMAL/BOSS/HIDDEN vs PRESTIGE_*)
+  const collectionType = new Map<string, string>(COLLECTIONS.map((c) => [c.id, c.type]));
+  const IS_DEFAULT = (t: string) => t === "NORMAL" || t === "BOSS" || t === "HIDDEN";
+  const IS_PRESTIGE = (t: string) => t === "PRESTIGE_NORMAL" || t === "PRESTIGE_BOSS";
+
   // players
   const now = Date.now();
   for (let i = 0; i < FAKE_PLAYERS.length; i++) {
     const name = FAKE_PLAYERS[i];
     const uuid = uuidFromName(name);
 
-    // Each player gets 0..70% of the catalog at random
+    // Build a believable distribution so the leaderboard ranks meaningfully:
+    //   - player 0: empty (edge case)
+    //   - player 1: full completionist (edge case)
+    //   - players 2..15: "active grinders" — fully complete 2..8 random
+    //     collections, plus a handful of random extras
+    //   - rest: random scatter (mostly partial, few full collections)
     const portion = rand();
     let granted: Entry[];
-    if (i === 0) granted = []; // empty holder edge case
-    else if (i === 1) granted = [...allEntries]; // completionist edge case
-    else granted = slice(allEntries, Math.floor(allEntries.length * portion * 0.7));
+    if (i === 0) {
+      granted = [];
+    } else if (i === 1) {
+      granted = [...allEntries];
+    } else if (i < 16) {
+      const completeCount = 2 + Math.floor(rand() * 7);
+      const shuffledIds = slice(COLLECTIONS.map((c) => c.id), COLLECTIONS.length);
+      const chosen = shuffledIds.slice(0, completeCount);
+      granted = allEntries.filter((e) => chosen.includes(e.collectionId));
+      // sprinkle 10..40 random extras from other collections
+      const extras = slice(allEntries.filter((e) => !chosen.includes(e.collectionId)), 10 + Math.floor(rand() * 30));
+      granted = [...granted, ...extras];
+    } else {
+      granted = slice(allEntries, Math.floor(allEntries.length * portion * 0.7));
+    }
 
     const entries = granted.map((e) => ({
       identifier: e.identifier,
@@ -240,6 +262,22 @@ async function seed() {
       `INSERT INTO player_data(uuid, data, updated_at) VALUES ($1, $2, NOW())`,
       [uuid, JSON.stringify(data)],
     );
+
+    // Derive clr_log_stats. Mirrors LogHolder.countCompleted(predicate):
+    // counts INDIVIDUAL entries whose collection matches the predicate,
+    // not the number of fully-completed collections.
+    let normalCount = 0;
+    let prestigeCount = 0;
+    for (const e of granted) {
+      const t = collectionType.get(e.collectionId) ?? "NORMAL";
+      if (IS_DEFAULT(t)) normalCount++;
+      else if (IS_PRESTIGE(t)) prestigeCount++;
+    }
+    await pg.query(
+      `INSERT INTO clr_log_stats(player_id, player_name, total_normal_logs, total_prestige_logs)
+       VALUES ($1, $2, $3, $4)`,
+      [uuid, name, normalCount, prestigeCount],
+    );
   }
 
   // summary
@@ -250,7 +288,12 @@ async function seed() {
   const playerCount = (await pg.query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM player_data`))
     .rows[0].count;
 
-  console.log(`[seed] done: ${collCount} collections, ${entryCount} entries, ${playerCount} players → mock.db`);
+  const statsCount = (await pg.query<{ count: string }>(`SELECT COUNT(*)::text AS count FROM clr_log_stats`))
+    .rows[0].count;
+
+  console.log(
+    `[seed] done: ${collCount} collections, ${entryCount} entries, ${playerCount} players, ${statsCount} stats rows → mock.db`,
+  );
   await pg.close();
 }
 

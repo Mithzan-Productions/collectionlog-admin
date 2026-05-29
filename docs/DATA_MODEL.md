@@ -2,6 +2,31 @@
 
 Two layers: MCPlus's existing `player_data` table (untouched by us), and a new catalog projection (`catalog_*`) that the plugin writes on startup.
 
+## Plugin-owned tables (read-only contracts)
+
+### `clr_log_stats` — leaderboard counters
+
+Owned by the CollectionLogReloaded plugin's `SqlStatProvider`. We never write here; the website only `SELECT`s. Lives in the same Postgres database as MCPlus's `player_data` (the plugin is configured to point at the same DB).
+
+```sql
+-- Owned by the plugin, not by this repo's migrations
+CREATE TABLE clr_log_stats (
+  id                  SERIAL PRIMARY KEY,
+  player_id           UUID NOT NULL UNIQUE,
+  player_name         TEXT NOT NULL,
+  total_normal_logs   INTEGER NOT NULL DEFAULT 0,
+  total_prestige_logs INTEGER NOT NULL DEFAULT 0
+);
+```
+
+- `total_normal_logs` = `countCompleted(IS_DEFAULT)` — count of **individual entries** the player has in NORMAL / BOSS / HIDDEN collections. (Misleading name — "logs" here means "log entries," not "completed collections." `countCompleted` in `LogHolder.java` flatMaps every granted entry and filters by collection type.)
+- `total_prestige_logs` = `countCompleted(IS_PRESTIGE)` — count of entries the player has in PRESTIGE_NORMAL or PRESTIGE_BOSS collections.
+- `total_normal_logs + total_prestige_logs` ≈ total entry count from `player_data.data->'collectionlog'->'entries'`. Will differ only if entries reference collections that no longer exist in the catalog.
+- Plugin updates this table async-batched on every entry grant via `StatsManager.updateStats(holder)`. Also written in bulk on `/clr datasave` and shutdown.
+- The in-game `/logstats` command reads this table (60s-polled cache).
+
+The website's leaderboard surfaces these exact numbers so operators can spot-check against `/logstats`.
+
 ## MCPlus tables (read-only contract)
 
 We do **not** own these. MCPlus's `PlayerDataTable.kt` is authoritative. We read it and we call our own `grant_entries(...)` function that operates on it.
