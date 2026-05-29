@@ -1,33 +1,206 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #0b0d10;
-  --color-panel: #14171c;
-  --color-panel-2: #1b1f26;
-  --color-border: #262b33;
-  --color-fg: #e5e7eb;
-  --color-fg-muted: #9ca3af;
-  --color-accent: #60a5fa;
-  --color-accent-2: #34d399;
-  --color-warn: #f59e0b;
-  --color-danger: #f87171;
+  /* Force sharp corners site-wide — operator-catalog aesthetic.
+     Overrides Tailwind v4's default radii so every `rounded*` utility
+     emitted by sub-agents flattens automatically. */
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-3xl: 0;
+  --radius-full: 0;
 
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  /* Warm dark palette — not the cold blue-gray default */
+  --color-ink: #0d0c0a;          /* page background */
+  --color-paper: #16140f;        /* panel */
+  --color-paper-2: #1d1b15;      /* panel raised */
+  --color-rule: #2a2620;         /* borders/dividers */
+  --color-rule-2: #3c372e;       /* stronger border */
+  --color-fg: #f5f1e8;           /* primary text — warm off-white */
+  --color-fg-muted: #a39c8a;     /* secondary text */
+  --color-fg-dim: #6b6557;       /* tertiary text */
+
+  /* Accents — single decisive lime, used surgically */
+  --color-lime: #b8e92d;         /* primary accent */
+  --color-lime-dim: #7a9c1e;     /* dimmed accent for borders */
+  --color-amber: #f4a82c;        /* warn */
+  --color-rust: #e8633a;         /* danger */
+  --color-vellum: #d4c896;       /* soft secondary */
+
+  /* Status glyphs — used in tables/lists */
+  --status-granted: var(--color-lime);
+  --status-pending: var(--color-amber);
+  --status-empty: var(--color-fg-dim);
+
+  --font-display: "Big Shoulders Display", ui-sans-serif, sans-serif;
+  --font-mono: "Fragment Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "Fragment Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Legacy token aliases — agents and earlier code reference these.
+     Remapped to the new palette so the warm-dark + lime aesthetic flows everywhere. */
+  --color-bg: var(--color-ink);
+  --color-panel: var(--color-paper);
+  --color-panel-2: var(--color-paper-2);
+  --color-border: var(--color-rule);
+  --color-accent: var(--color-lime);
+  --color-accent-2: var(--color-amber);
+  --color-warn: var(--color-amber);
+  --color-danger: var(--color-rust);
 }
 
 html, body {
-  background: var(--color-bg);
+  background: var(--color-ink);
   color: var(--color-fg);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
+  font-feature-settings: "ss01", "ss02", "calt";
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: geometricPrecision;
 }
 
 * {
-  border-color: var(--color-border);
+  border-color: var(--color-rule);
+}
+
+/* Subtle paper-grain background — adds atmosphere without distracting */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.025;
+  background-image:
+    repeating-linear-gradient(0deg, transparent 0 2px, rgba(245, 241, 232, 0.4) 2px 3px),
+    repeating-linear-gradient(90deg, transparent 0 2px, rgba(245, 241, 232, 0.3) 2px 3px);
+  background-size: 3px 3px;
+  mix-blend-mode: screen;
 }
 
 ::selection {
-  background: var(--color-accent);
-  color: var(--color-bg);
+  background: var(--color-lime);
+  color: var(--color-ink);
 }
+
+/* Typography utilities */
+.display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 0.9;
+  text-transform: uppercase;
+}
+
+.label-tiny {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-fg-dim);
+}
+
+/* Status glyphs — pure CSS, no icons */
+.glyph {
+  display: inline-block;
+  width: 1.25em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sharp-cornered "ticket" frame — used on panels, dialogs, key data */
+.ticket {
+  position: relative;
+  background: var(--color-paper);
+  border: 1px solid var(--color-rule-2);
+}
+.ticket::before,
+.ticket::after {
+  content: "";
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-ink);
+}
+.ticket::before { top: -1px; left: -1px; border-right: none; border-bottom: none; }
+.ticket::after { bottom: -1px; right: -1px; border-left: none; border-top: none; }
+
+/* Dotted "punch card" divider */
+.punchline {
+  border: none;
+  border-top: 1px dashed var(--color-rule-2);
+  margin: 0;
+}
+
+/* Hex chip — visual motif for the &#hex codes that pervade the data */
+.hex-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  height: 18px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  background: var(--color-ink);
+  border: 1px solid var(--color-rule-2);
+  color: var(--color-fg-muted);
+}
+
+/* Loading shimmer */
+@keyframes shimmer {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+.shimmer { animation: shimmer 1.2s ease-in-out infinite; }
+
+/* Subtle stagger entrance — used once per page load */
+@keyframes settle {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.settle {
+  animation: settle 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+}
+
+/* Reusable focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-lime);
+  outline-offset: 2px;
+}
+
+/* Hide scrollbars on horizontal scroll areas but keep functionality */
+.scroll-x {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-rule-2) transparent;
+}
+
+/* Tabular data */
+table.data {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+table.data th {
+  text-align: left;
+  font-weight: 500;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-fg-dim);
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-rule-2);
+}
+table.data td {
+  padding: 10px 12px;
+  border-bottom: 1px dashed var(--color-rule);
+  vertical-align: middle;
+}
+table.data tr:last-child td { border-bottom: none; }
+table.data tbody tr:hover { background: var(--color-paper-2); }

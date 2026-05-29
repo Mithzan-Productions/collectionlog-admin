@@ -1,55 +1,171 @@
 import Link from "next/link";
+import { rawQuery } from "@/db/client";
 
-export default function Home() {
+async function summary() {
+  const [c] = await rawQuery<{ n: string }>(`SELECT COUNT(*)::text AS n FROM catalog_collections`);
+  const [e] = await rawQuery<{ n: string }>(`SELECT COUNT(*)::text AS n FROM catalog_entries`);
+  const [p] = await rawQuery<{ n: string }>(`SELECT COUNT(*)::text AS n FROM player_data`);
+  const [m] = await rawQuery<{ n: string }>(
+    `SELECT COUNT(*)::text AS n FROM dev_messagebus_log`,
+  ).catch(() => [{ n: "0" }]);
+  return {
+    collections: Number(c?.n ?? 0),
+    entries: Number(e?.n ?? 0),
+    players: Number(p?.n ?? 0),
+    messages: Number(m?.n ?? 0),
+  };
+}
+
+export default async function Home() {
+  const s = await summary();
+
   return (
-    <div className="space-y-8">
-      <section className="space-y-2">
-        <h1 className="text-2xl font-semibold">CollectionLog admin</h1>
-        <p className="text-sm text-[var(--color-fg-muted)]">
-          Browse the collection catalog, view player progress, and grant or revoke entries.
-        </p>
-      </section>
-
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <Link
-          href="/catalog"
-          className="block rounded border bg-[var(--color-panel)] p-5 transition hover:bg-[var(--color-panel-2)]"
-        >
-          <div className="mb-1 text-sm font-mono text-[var(--color-accent)]">/catalog</div>
-          <div className="font-medium">Catalog</div>
-          <p className="mt-2 text-sm text-[var(--color-fg-muted)]">
-            Search collectables by friendly name. Powered by Postgres trigram search.
+    <div className="space-y-12">
+      {/* ────── Hero ────── */}
+      <section className="grid grid-cols-12 gap-6">
+        <div className="col-span-12 lg:col-span-8 settle">
+          <div className="label-tiny mb-4">CL/index ── operator console v0.1</div>
+          <h1 className="display text-[clamp(56px,9vw,128px)] text-[var(--color-fg)]">
+            COLLECTION
+            <br />
+            <span className="text-[var(--color-lime)]">LOG/</span>
+            <span className="text-[var(--color-vellum)]">OPER</span>
+          </h1>
+          <p className="mt-6 max-w-[52ch] text-sm leading-relaxed text-[var(--color-fg-muted)]">
+            Search the catalog. Grant collections to a player. Revoke a single drop.
+            Operations land in Postgres atomically and the plugin reloads the holder over
+            <span className="text-[var(--color-lime)]"> mcplus</span>.
+            Read{" "}
+            <Link href={"/catalog" as never} className="text-[var(--color-fg)] underline decoration-[var(--color-lime)] decoration-2 underline-offset-4 hover:text-[var(--color-lime)]">
+              /catalog
+            </Link>
+            , write{" "}
+            <Link href={"/players" as never} className="text-[var(--color-fg)] underline decoration-[var(--color-lime)] decoration-2 underline-offset-4 hover:text-[var(--color-lime)]">
+              /players
+            </Link>
+            .
           </p>
-        </Link>
-
-        <Link
-          href="/players"
-          className="block rounded border bg-[var(--color-panel)] p-5 transition hover:bg-[var(--color-panel-2)]"
-        >
-          <div className="mb-1 text-sm font-mono text-[var(--color-accent)]">/players</div>
-          <div className="font-medium">Players</div>
-          <p className="mt-2 text-sm text-[var(--color-fg-muted)]">
-            View a player&apos;s collection progress, grant or revoke entries.
-          </p>
-        </Link>
-      </section>
-
-      <section className="rounded border bg-[var(--color-panel)] p-5 text-sm text-[var(--color-fg-muted)]">
-        <div className="mb-2 font-mono text-xs uppercase tracking-wider text-[var(--color-fg)]">
-          Dev tips
         </div>
-        <ul className="space-y-1 list-disc pl-5">
-          <li>
-            Regenerate fake data with <code className="font-mono text-[var(--color-accent-2)]">pnpm db:seed</code>
-          </li>
-          <li>
-            All design docs live in <code className="font-mono">docs/</code> at the repo root
-          </li>
-          <li>
-            See <code className="font-mono">ROADMAP.md</code> for what&apos;s built and what&apos;s next
-          </li>
-        </ul>
+
+        <aside className="col-span-12 lg:col-span-4">
+          <div className="ticket settle" style={{ animationDelay: "150ms" }}>
+            <div className="flex items-center justify-between border-b border-dashed border-[var(--color-rule-2)] px-4 py-2">
+              <span className="label-tiny">snapshot</span>
+              <span className="font-mono text-[10px] text-[var(--color-fg-dim)]">mock.db</span>
+            </div>
+            <dl className="divide-y divide-dashed divide-[var(--color-rule-2)]">
+              <Row k="collections" v={s.collections} />
+              <Row k="entries" v={s.entries} accent />
+              <Row k="players" v={s.players} />
+              <Row k="bus.events" v={s.messages} dim />
+            </dl>
+          </div>
+        </aside>
+      </section>
+
+      <hr className="punchline" />
+
+      {/* ────── Quick lanes ────── */}
+      <section className="grid grid-cols-1 gap-px bg-[var(--color-rule-2)] md:grid-cols-2 settle" style={{ animationDelay: "240ms" }}>
+        <Lane
+          href="/catalog"
+          code="C-01"
+          name="catalog"
+          desc="Trigram search across every entry. Browse by collection."
+          shortcut="g c"
+        />
+        <Lane
+          href="/players"
+          code="P-01"
+          name="players"
+          desc="Inspect a holder. Grant collections. Revoke drops. Safe-by-default."
+          shortcut="g p"
+        />
+      </section>
+
+      {/* ────── Dev tape ────── */}
+      <section className="settle" style={{ animationDelay: "320ms" }}>
+        <div className="label-tiny mb-3">CL/devtape</div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border border-[var(--color-rule-2)] bg-[var(--color-paper)] px-5 py-4 text-xs text-[var(--color-fg-muted)]">
+          <Tape label="seed" cmd="pnpm db:seed" />
+          <Tape label="repl" cmd="pnpm db:repl" />
+          <Tape label="bus log" cmd="select * from dev_messagebus_log;" mono />
+          <Tape label="docs" cmd="docs/ROADMAP.md" mono />
+        </div>
       </section>
     </div>
+  );
+}
+
+function Row({ k, v, accent, dim }: { k: string; v: number; accent?: boolean; dim?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+      <dt className="label-tiny">{k}</dt>
+      <dd
+        className={
+          "font-display text-[28px] tabular-nums leading-none tracking-tight " +
+          (accent
+            ? "text-[var(--color-lime)]"
+            : dim
+              ? "text-[var(--color-fg-dim)]"
+              : "text-[var(--color-fg)]")
+        }
+      >
+        {v.toLocaleString()}
+      </dd>
+    </div>
+  );
+}
+
+function Lane({
+  href,
+  code,
+  name,
+  desc,
+  shortcut,
+}: {
+  href: string;
+  code: string;
+  name: string;
+  desc: string;
+  shortcut: string;
+}) {
+  return (
+    <Link
+      href={href as never}
+      className="group relative flex flex-col gap-6 bg-[var(--color-ink)] p-8 transition hover:bg-[var(--color-paper)]"
+    >
+      <div className="flex items-center justify-between">
+        <span className="label-tiny text-[var(--color-lime-dim)] transition group-hover:text-[var(--color-lime)]">
+          {code}
+        </span>
+        <span className="font-mono text-[10px] text-[var(--color-fg-dim)]">
+          <span className="opacity-50">⌘</span> {shortcut}
+        </span>
+      </div>
+      <div>
+        <div className="display text-[64px] leading-[0.85] text-[var(--color-fg)] transition group-hover:text-[var(--color-lime)]">
+          {name.toUpperCase()}/
+        </div>
+        <p className="mt-3 max-w-[40ch] text-sm text-[var(--color-fg-muted)]">{desc}</p>
+      </div>
+      <span
+        aria-hidden
+        className="absolute right-6 bottom-6 font-mono text-xs text-[var(--color-fg-dim)] transition group-hover:text-[var(--color-lime)] group-hover:translate-x-1"
+      >
+        ──&gt;
+      </span>
+    </Link>
+  );
+}
+
+function Tape({ label, cmd, mono }: { label: string; cmd: string; mono?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <span className="label-tiny">{label}</span>
+      <code className={mono ? "font-mono text-[var(--color-vellum)]" : "font-mono text-[var(--color-lime)]"}>
+        {cmd}
+      </code>
+    </span>
   );
 }

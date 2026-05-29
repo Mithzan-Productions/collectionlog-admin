@@ -10,6 +10,53 @@ export async function listCollections() {
   return db.select().from(catalogCollections).orderBy(asc(catalogCollections.menuWeight));
 }
 
+export type CollectionWithCount = {
+  identifier: string;
+  displayNamePlain: string;
+  displayNameRaw: string | null;
+  menuIcon: string | null;
+  type: string | null;
+  menuWeight: number | null;
+  entryCount: number;
+};
+
+/**
+ * Like {@link listCollections} but with a per-collection entry count.
+ * One trip, single aggregate join.
+ */
+export async function listCollectionsWithCounts(): Promise<CollectionWithCount[]> {
+  const rows = await rawQuery<{
+    identifier: string;
+    display_name_plain: string;
+    display_name_raw: string | null;
+    menu_icon: string | null;
+    type: string | null;
+    menu_weight: number | null;
+    entry_count: number;
+  }>(
+    `SELECT c.identifier,
+            c.display_name_plain,
+            c.display_name_raw,
+            c.menu_icon,
+            c.type,
+            c.menu_weight,
+            COALESCE(COUNT(e.identifier), 0)::int AS entry_count
+       FROM catalog_collections c
+       LEFT JOIN catalog_entries e ON e.collection_id = c.identifier
+      GROUP BY c.identifier
+      ORDER BY c.menu_weight ASC NULLS LAST, c.display_name_plain ASC`,
+  );
+  return rows.map((r) => ({
+    identifier: r.identifier,
+    displayNamePlain: r.display_name_plain,
+    displayNameRaw: r.display_name_raw,
+    menuIcon: r.menu_icon,
+    type: r.type,
+    menuWeight: r.menu_weight,
+    entryCount: Number(r.entry_count),
+  }));
+}
+
 export async function getCollection(id: string) {
   const rows = await db
     .select()
@@ -168,4 +215,67 @@ export async function progressByCollection(uuid: string) {
 export async function isOnline(uuid: string): Promise<boolean> {
   // In prod we'd check Redis or a `players_online` projection. Always false in mock.
   return false;
+}
+
+/**
+ * Granted entries for a player, joined to the catalog so we can render
+ * colored names in the revoke list. Returns rows ordered by collection
+ * menu_weight, then entry menu_weight.
+ *
+ * Entries whose catalog row has been deleted (e.g. catalog re-sync removed
+ * them) still appear so the operator can revoke stale grants — their
+ * display name falls back to the raw identifier.
+ */
+export type GrantedEntryRow = {
+  identifier: string;
+  collection_id: string;
+  display_name_plain: string | null;
+  display_name_raw: string | null;
+  collection_display_plain: string | null;
+  collection_display_raw: string | null;
+  ts: number | null;
+};
+
+export async function listGrantedEntries(uuid: string): Promise<GrantedEntryRow[]> {
+  const ns = NAMESPACE;
+  const rows = await rawQuery<GrantedEntryRow>(
+    `WITH granted AS (
+       SELECT (e->>'identifier')   AS identifier,
+              (e->>'collectionId') AS collection_id,
+              ((e->>'_ts')::bigint) AS ts
+         FROM player_data p,
+              jsonb_array_elements(COALESCE(p.data->$1->'entries', '[]'::jsonb)) e
+        WHERE p.uuid = $2::uuid
+     )
+     SELECT g.identifier,
+            g.collection_id,
+            e.display_name_plain,
+            e.display_name_raw,
+            c.display_name_plain AS collection_display_plain,
+            c.display_name_raw   AS collection_display_raw,
+            g.ts
+       FROM granted g
+       LEFT JOIN catalog_entries     e ON e.identifier = g.identifier AND e.collection_id = g.collection_id
+       LEFT JOIN catalog_collections c ON c.identifier = g.collection_id
+      ORDER BY c.menu_weight ASC NULLS LAST,
+               e.menu_weight ASC NULLS LAST,
+               g.identifier ASC`,
+    [ns, uuid],
+  );
+  return rows;
+}
+
+/**
+ * Lightweight collection picker list (id + plain + raw display names) used
+ * by the "Grant entire collection" select.
+ */
+export async function listCollectionsForPicker() {
+  return db
+    .select({
+      identifier: catalogCollections.identifier,
+      displayNamePlain: catalogCollections.displayNamePlain,
+      displayNameRaw: catalogCollections.displayNameRaw,
+    })
+    .from(catalogCollections)
+    .orderBy(asc(catalogCollections.menuWeight));
 }
