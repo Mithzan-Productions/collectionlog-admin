@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { rawQuery } from "@/db/client";
+import { rawQuery, isMock } from "@/db/client";
 
 // DB-backed — never prerender at build time
 export const dynamic = "force-dynamic";
@@ -86,16 +86,18 @@ export default async function Home() {
         />
       </section>
 
-      {/* ────── Dev tape ────── */}
-      <section className="settle" style={{ animationDelay: "320ms" }}>
-        <div className="label-tiny mb-3">CL/devtape</div>
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border border-[var(--color-rule-2)] bg-[var(--color-paper)] px-5 py-4 text-xs text-[var(--color-fg-muted)]">
-          <Tape label="seed" cmd="pnpm db:seed" />
-          <Tape label="repl" cmd="pnpm db:repl" />
-          <Tape label="bus log" cmd="select * from dev_messagebus_log;" mono />
-          <Tape label="docs" cmd="docs/ROADMAP.md" mono />
-        </div>
-      </section>
+      {/* ────── Dev tape (hidden in prod) ────── */}
+      {isMock && (
+        <section className="settle" style={{ animationDelay: "320ms" }}>
+          <div className="label-tiny mb-3">CL/devtape</div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border border-[var(--color-rule-2)] bg-[var(--color-paper)] px-5 py-4 text-xs text-[var(--color-fg-muted)]">
+            <Tape label="seed" cmd="pnpm db:seed" />
+            <Tape label="repl" cmd="pnpm db:repl" />
+            <Tape label="bus log" cmd="select * from dev_messagebus_log;" mono />
+            <Tape label="docs" cmd="docs/ROADMAP.md" mono />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Big_Shoulders, Fragment_Mono } from "next/font/google";
+import { isMock } from "@/db/client";
 import "./globals.css";
 
 const display = Big_Shoulders({
@@ -49,8 +50,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               </nav>
               <div className="ml-auto flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-dim)]">
                 <span className="flex items-center gap-1.5">
-                  <span className="inline-block h-1.5 w-1.5 bg-[var(--color-lime)] shimmer" />
-                  mock.db
+                  <span
+                    className={
+                      "inline-block h-1.5 w-1.5 shimmer " +
+                      (isMock ? "bg-[var(--color-amber)]" : "bg-[var(--color-lime)]")
+                    }
+                  />
+                  {isMock ? "mock.db" : "live"}
                 </span>
                 <span className="hidden sm:inline">·</span>
                 <span className="hidden font-mono sm:inline">v0.1.0</span>
@@ -64,11 +70,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-4 text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-dim)]">
               <span>
                 <span className="text-[var(--color-fg-muted)]">collectionlog-admin</span>
-                <span className="mx-2">·</span>
-                local · backed by <code className="font-mono text-[var(--color-vellum)]">mock.db</code>
+                {isMock && (
+                  <>
+                    <span className="mx-2">·</span>
+                    local · backed by{" "}
+                    <code className="font-mono text-[var(--color-vellum)]">mock.db</code>
+                  </>
+                )}
               </span>
               <span className="font-mono">
-                ENV={process.env.NODE_ENV} · NS={process.env.COLLECTIONLOG_NAMESPACE ?? "collectionlog"}
+                NS={process.env.COLLECTIONLOG_NAMESPACE ?? "collectionlog"}
               </span>
             </div>
           </footer>
