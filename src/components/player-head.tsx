@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { UserRound } from "lucide-react";
 
 /**
- * Minecraft player head from api.mcheads.org.
+ * Minecraft player head from api.mcheads.org, proxied through next/image so
+ * Vercel's CDN caches the optimized variant. Once a head has been fetched
+ * successfully it keeps rendering even when the upstream API is rate-limited
+ * or down.
+ *
  * Pixel-perfect rendering (no smoothing), sharp border, square.
- * Falls back to a generic icon if the API 404s (e.g. fake seed names).
+ * Falls back to a generic icon on first-load failure (404 / timeout / etc).
  */
 export function PlayerHead({
   name,
@@ -34,16 +39,16 @@ export function PlayerHead({
     );
   }
 
-  // The API serves at any requested size — fetch what we display to save bytes.
+  // Request the exact display size from mcheads.org so the upstream payload —
+  // and the cached variant — stays small.
   const src = `https://api.mcheads.org/head/${encodeURIComponent(name)}/${size}`;
 
   return (
-    <img
+    <Image
       src={src}
       alt={`${name} head`}
       width={size}
       height={size}
-      loading="lazy"
       onError={() => setErrored(true)}
       className={"shrink-0 border border-[var(--color-rule-2)] bg-[var(--color-paper-2)] " + className}
       style={{ imageRendering: "pixelated", width: size, height: size }}
