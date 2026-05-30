@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Big_Shoulders, Fragment_Mono } from "next/font/google";
 import { isMock } from "@/db/client";
+import { getAuthSession } from "@/auth";
+import { AuthControl } from "@/components/auth-control";
 import "./globals.css";
 
 const display = Big_Shoulders({
@@ -23,7 +25,8 @@ export const metadata: Metadata = {
   description: "Operator console for CollectionLogReloaded player data",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await getAuthSession();
   return (
     <html lang="en" className={`${display.variable} ${mono.variable}`}>
       <body className="min-h-screen">
@@ -49,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <NavLink href="/catalog" label="catalog" hint="C-02" />
                 <NavLink href="/players" label="players" hint="P-03" />
               </nav>
-              <div className="ml-auto flex items-center gap-3 text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-dim)]">
+              <div className="ml-auto flex items-center gap-4 text-[10px] uppercase tracking-[0.2em] text-[var(--color-fg-dim)]">
                 <span className="flex items-center gap-1.5">
                   <span
                     className={
@@ -60,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   {isMock ? "mock.db" : "live"}
                 </span>
                 <span className="hidden sm:inline">·</span>
-                <span className="hidden font-mono sm:inline">v0.1.0</span>
+                <AuthControl session={session} />
               </div>
             </div>
           </header>

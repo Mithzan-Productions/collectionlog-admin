@@ -57,11 +57,13 @@ export function GrantPanel({
   holder,
   collections,
   granted,
+  isAdmin,
 }: {
   uuid: string;
   holder: LogHolder;
   collections: CollectionOption[];
   granted: GrantedEntryRow[];
+  isAdmin: boolean;
 }) {
   const router = useRouter();
   // `query` here is the *debounced* query — only updates when SearchInput
@@ -261,7 +263,8 @@ export function GrantPanel({
         </div>
       )}
 
-      {/* Search box */}
+      {/* Search box — admin only */}
+      {isAdmin && (
       <div className="space-y-3 rounded border bg-[var(--color-panel)] p-4">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-medium">Search & grant entries</div>
@@ -336,8 +339,10 @@ export function GrantPanel({
           </Button>
         </div>
       </div>
+      )}
 
-      {/* Grant / revoke entire collection */}
+      {/* Grant / revoke entire collection — admin only */}
+      {isAdmin && (
       <div className="space-y-3 border border-[var(--color-rule-2)] bg-[var(--color-paper)] p-4">
         <div className="flex items-center gap-2 text-sm font-medium">
           <Layers className="h-4 w-4 text-[var(--color-fg-muted)]" />
@@ -372,8 +377,9 @@ export function GrantPanel({
           Both operations are dedup-safe — only what needs to change does.
         </p>
       </div>
+      )}
 
-      {/* Granted list with revoke */}
+      {/* Granted list — revoke buttons admin-only */}
       <div className="rounded border bg-[var(--color-panel)]">
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="text-sm font-medium">
@@ -410,16 +416,18 @@ export function GrantPanel({
                     <span className="truncate font-mono">{g.identifier}</span>
                   </div>
                 </div>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  className="gap-1.5 opacity-70 transition-opacity group-hover:opacity-100"
-                  disabled={mutationPending}
-                  onClick={() => askRevoke(g)}
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Revoke
-                </Button>
+                {isAdmin && (
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    className="gap-1.5 opacity-70 transition-opacity group-hover:opacity-100"
+                    disabled={mutationPending}
+                    onClick={() => askRevoke(g)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Revoke
+                  </Button>
+                )}
               </li>
             ))}
           </ul>

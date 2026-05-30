@@ -8,10 +8,12 @@ import {
   searchEntries,
 } from "@/db/queries";
 import { publishHolderReload } from "@/lib/messagebus";
+import { requireAdmin } from "@/auth";
 
 export type EntryKey = { identifier: string; collectionId: string };
 
 export async function grantAction(uuid: string, entries: EntryKey[]) {
+  await requireAdmin();
   const n = await grantEntries(uuid, entries);
   if (n > 0) await publishHolderReload(uuid);
   revalidatePath(`/players/${uuid}`);
@@ -19,6 +21,7 @@ export async function grantAction(uuid: string, entries: EntryKey[]) {
 }
 
 export async function revokeAction(uuid: string, entries: EntryKey[]) {
+  await requireAdmin();
   const n = await revokeEntries(uuid, entries);
   if (n > 0) await publishHolderReload(uuid);
   revalidatePath(`/players/${uuid}`);
@@ -26,16 +29,19 @@ export async function revokeAction(uuid: string, entries: EntryKey[]) {
 }
 
 export async function grantCollectionAction(uuid: string, collectionId: string) {
+  await requireAdmin();
   const entries = await entriesForGrantingCollection(collectionId);
   return grantAction(uuid, entries);
 }
 
 export async function revokeCollectionAction(uuid: string, collectionId: string) {
+  await requireAdmin();
   // Pass every catalog entry — revoke_entries is a no-op for ones not on the holder.
   const entries = await entriesForGrantingCollection(collectionId);
   return revokeAction(uuid, entries);
 }
 
 export async function searchAction(q: string) {
+  // Search is read-only — anyone can call it.
   return searchEntries(q, 50);
 }

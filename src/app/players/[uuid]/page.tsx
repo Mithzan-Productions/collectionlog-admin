@@ -10,6 +10,7 @@ import {
 } from "@/db/queries";
 import { Badge } from "@/components/ui/badge";
 import { PlayerHead } from "@/components/player-head";
+import { getAuthSession } from "@/auth";
 import { GrantPanel } from "./grant-panel";
 import { ProgressSection } from "./progress-section";
 
@@ -31,12 +32,14 @@ export default async function PlayerDetailPage({
   const holder = await getPlayer(uuid);
   if (!holder) notFound();
 
-  const [progress, online, collections, granted] = await Promise.all([
+  const [progress, online, collections, granted, session] = await Promise.all([
     progressByCollection(uuid),
     isOnline(uuid),
     listCollectionsForPicker(),
     listGrantedEntries(uuid),
+    getAuthSession(),
   ]);
+  const isAdmin = Boolean(session?.user?.isAdmin);
 
   const totalGranted = progress.reduce((acc, r) => acc + Number(r.granted ?? 0), 0);
   const totalEntries = progress.reduce((acc, r) => acc + Number(r.total ?? 0), 0);
@@ -126,17 +129,21 @@ export default async function PlayerDetailPage({
         )}
       </section>
 
-      {/* Grant / revoke section */}
+      {/* Grant / revoke section. Heading + mutation panels render only for admins;
+          non-admins still see the granted list inside GrantPanel for read-only inspection. */}
       <section className="space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium">
-          <Sparkles className="h-4 w-4 text-[var(--color-accent-2)]" />
-          Grant entries
-        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <Sparkles className="h-4 w-4 text-[var(--color-accent-2)]" />
+            Grant entries
+          </div>
+        )}
         <GrantPanel
           uuid={uuid}
           holder={holder}
           collections={collections}
           granted={granted}
+          isAdmin={isAdmin}
         />
       </section>
     </div>
