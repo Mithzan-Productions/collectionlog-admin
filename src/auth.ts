@@ -18,6 +18,7 @@ function parseAdminIds(): string[] {
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  // Auth.js v5 reads AUTH_DISCORD_ID / AUTH_DISCORD_SECRET from env automatically.
   providers: [Discord],
   session: { strategy: "jwt" },
   trustHost: true,
