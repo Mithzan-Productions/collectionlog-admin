@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Analytics } from "@vercel/analytics/next";
 import Link from "next/link";
 import { Big_Shoulders, Fragment_Mono } from "next/font/google";
 import { isMock } from "@/db/client";
@@ -88,6 +89,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             </div>
           </footer>
         </div>
+        <Analytics />
       </body>
     </html>
   );
