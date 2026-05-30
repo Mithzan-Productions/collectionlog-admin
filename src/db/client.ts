@@ -20,7 +20,12 @@ const MOCK_DB_PATH = join(process.cwd(), "mock.db");
 function buildClient(): DbClient {
   const url = process.env.DATABASE_URL;
   if (url) {
-    const sql = postgres(url, { prepare: false });
+    const sql = postgres(url, {
+      prepare: false,
+      max: 1,                  // serverless: one connection per function instance
+      idle_timeout: 20,        // close after 20s idle so Postgres reclaims slots
+      connect_timeout: 10,
+    });
     return drizzlePg(sql, { schema });
   }
 
