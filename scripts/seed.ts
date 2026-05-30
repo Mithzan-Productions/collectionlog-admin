@@ -172,21 +172,18 @@ async function seed() {
     await pg.exec(readFileSync(join(MIGRATIONS_DIR, f), "utf8"));
   }
 
-  // catalog
+  // Catalog. Build one JSONB blob per collection (entries nested inside)
+  // matching the plugin's LogCollection JSON shape, then upsert into
+  // collection_definitions. catalog_collections is a view and catalog_entries
+  // is a materialized view we refresh once at the end.
   type Entry = { identifier: string; collectionId: string; raw: string; plain: string; material: string };
   const allEntries: Entry[] = [];
 
   for (const c of COLLECTIONS) {
     const raw = colorize(c.name);
-    const plain = stripColor(raw);
-    await pg.query(
-      `INSERT INTO catalog_collections(identifier, display_name_plain, display_name_raw, menu_icon, type, menu_weight)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [c.id, plain, raw, c.icon, c.type, COLLECTIONS.indexOf(c)],
-    );
-
     const n = range(20, 70);
     const usedNames = new Set<string>();
+    const entriesJson: Record<string, unknown>[] = [];
     for (let i = 0; i < n; i++) {
       let name = fakeEntryName();
       while (usedNames.has(name)) name = fakeEntryName();
@@ -195,15 +192,40 @@ async function seed() {
       const plainN = stripColor(rawN);
       const material = pick(MATERIALS);
       const identifier = `${c.id}_${plainN.toLowerCase().replace(/[^a-z0-9]+/g, "_")}_${i}`;
-      const searchText = `${plainN} ${plain} ${identifier}`.toLowerCase();
-      await pg.query(
-        `INSERT INTO catalog_entries(identifier, collection_id, display_name_plain, display_name_raw, material, menu_weight, search_text)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [identifier, c.id, plainN, rawN, material, i, searchText],
-      );
+      entriesJson.push({
+        identifier,
+        collectionId: c.id,
+        displayName: rawN,
+        material,
+        menuWeight: i,
+        nbtMode: "BOTH",
+        count: 1,
+      });
       allEntries.push({ identifier, collectionId: c.id, raw: rawN, plain: plainN, material });
     }
+
+    const blob = {
+      identifier: c.id,
+      displayName: raw,
+      menuIcon: c.icon,
+      menuWeight: COLLECTIONS.indexOf(c),
+      type: c.type,
+      canUseCompleted: false,
+      rewards: [],
+      entries: entriesJson,
+    };
+
+    await pg.query(
+      `INSERT INTO collection_definitions(identifier, json_blob, updated_by)
+       VALUES ($1, $2::jsonb, 'seed')`,
+      [c.id, JSON.stringify(blob)],
+    );
   }
+
+  // Materialized view needs an explicit refresh after the inserts. PGlite
+  // supports REFRESH MATERIALIZED VIEW; CONCURRENTLY requires the unique index
+  // we created in the migration.
+  await pg.exec(`REFRESH MATERIALIZED VIEW catalog_entries`);
 
   // Type lookup for each collection (NORMAL/BOSS/HIDDEN vs PRESTIGE_*)
   const collectionType = new Map<string, string>(COLLECTIONS.map((c) => [c.id, c.type]));

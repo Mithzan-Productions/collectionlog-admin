@@ -1,6 +1,38 @@
 # Data model
 
-Two layers: MCPlus's existing `player_data` table (untouched by us), and a new catalog projection (`catalog_*`) that the plugin writes on startup.
+Three layers: MCPlus's `player_data` (untouched), the plugin-owned `clr_log_stats` (read-only for us), and the **catalog** — a JSONB-blob-per-collection store the plugin mirrors to (with website-owned views/matviews on top of it).
+
+## Catalog: `collection_definitions` + views
+
+```sql
+-- Canonical store. Plugin's SqlCatalogProvider upserts to this table on every
+-- CollectionManager.load() when Catalog.source = mirror.
+CREATE TABLE collection_definitions (
+  identifier  TEXT PRIMARY KEY,
+  json_blob   JSONB NOT NULL,
+  version     INTEGER NOT NULL DEFAULT 1,
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_by  TEXT
+);
+
+-- Audit log. Populated by an AFTER UPDATE trigger keyed on version change, so
+-- plugin-mirror writes (which don't bump version) don't pollute it. The website's
+-- Phase-4 editor + Phase-5 restore both bump version → both leave history.
+CREATE TABLE collection_definitions_history (
+  id           BIGSERIAL PRIMARY KEY,
+  identifier   TEXT NOT NULL,
+  json_blob    JSONB NOT NULL,
+  version      INTEGER NOT NULL,
+  replaced_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  replaced_by  TEXT
+);
+```
+
+`catalog_collections` is a plain VIEW over `collection_definitions` (small, no index needed). `catalog_entries` is a MATERIALIZED VIEW (one row per `(identifier, collection_id)`, ~5k rows, with the GIN trigram index that powers fuzzy search). Both are defined in `0003_catalog_definitions.sql`.
+
+**Refresh discipline:** the matview is refreshed explicitly by writers — the plugin's `SqlCatalogProvider.mirror()` calls `REFRESH MATERIALIZED VIEW CONCURRENTLY catalog_entries` at the end of its batch; the Phase-4 editor save action will do the same after committing the new blob. No trigger-based refresh — refresh-per-row would be O(N) per upsert.
+
+**JSONB shape:** the blob matches the plugin's existing JSON file format (the same shape Gson produces from `LogCollection`). Keys consumed by the views: `displayName`, `menuIcon`, `menuData`, `type`, `menuWeight`, `entries[]`. Anything else in the JSON is preserved but ignored by views.
 
 ## Plugin-owned tables (read-only contracts)
 

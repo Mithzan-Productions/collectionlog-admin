@@ -34,16 +34,24 @@ export async function listCollectionsWithCounts(): Promise<CollectionWithCount[]
     menu_weight: number | null;
     entry_count: number;
   }>(
+    // Subquery for counts keeps the outer SELECT free of GROUP BY constraints.
+    // catalog_collections is now a view backed by collection_definitions, so
+    // Postgres can't infer functional dependencies from the primary key the way
+    // it would for a table — we'd otherwise need every non-aggregate column in
+    // the GROUP BY clause.
     `SELECT c.identifier,
             c.display_name_plain,
             c.display_name_raw,
             c.menu_icon,
             c.type,
             c.menu_weight,
-            COALESCE(COUNT(e.identifier), 0)::int AS entry_count
+            COALESCE(ec.entry_count, 0) AS entry_count
        FROM catalog_collections c
-       LEFT JOIN catalog_entries e ON e.collection_id = c.identifier
-      GROUP BY c.identifier
+       LEFT JOIN (
+         SELECT collection_id, COUNT(*)::int AS entry_count
+           FROM catalog_entries
+          GROUP BY collection_id
+       ) ec ON ec.collection_id = c.identifier
       ORDER BY c.menu_weight ASC NULLS LAST, c.display_name_plain ASC`,
   );
   return rows.map((r) => ({
