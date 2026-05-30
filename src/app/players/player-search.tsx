@@ -31,6 +31,8 @@ function relativeTime(iso: string): string {
   return `${Math.floor(mo / 12)}y ago`;
 }
 
+const GRID_COLS = "grid-cols-[1fr_120px_100px_140px]";
+
 export function PlayerSearch({ initial }: { initial: PlayerListRow[] }) {
   const [query, setQuery] = useState("");
   const [rows, setRows] = useState<PlayerListRow[]>(initial);
@@ -66,63 +68,60 @@ export function PlayerSearch({ initial }: { initial: PlayerListRow[] }) {
         )}
       </div>
 
-      <div className="overflow-hidden rounded border bg-[var(--color-panel)]">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b text-left text-xs uppercase tracking-wider text-[var(--color-fg-muted)]">
-              <th className="px-4 py-2.5 font-medium">Name</th>
-              <th className="px-4 py-2.5 font-medium">UUID</th>
-              <th className="px-4 py-2.5 font-medium text-right">Entries</th>
-              <th className="px-4 py-2.5 font-medium text-right">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={4} className="px-4 py-10 text-center text-sm text-[var(--color-fg-muted)]">
-                  {query.trim() ? (
-                    <>No players match <span className="font-mono">{query}</span>.</>
-                  ) : (
-                    <>No players found.</>
-                  )}
-                </td>
-              </tr>
+      <div className="border border-[var(--color-rule-2)] bg-[var(--color-paper)]">
+        <div
+          className={`grid ${GRID_COLS} items-center gap-4 border-b border-dashed border-[var(--color-rule-2)] px-4 py-2.5`}
+        >
+          <span className="label-tiny">name</span>
+          <span className="label-tiny">uuid</span>
+          <span className="label-tiny text-right">entries</span>
+          <span className="label-tiny text-right">updated</span>
+        </div>
+
+        {rows.length === 0 ? (
+          <div className="px-4 py-10 text-center text-sm text-[var(--color-fg-muted)]">
+            {query.trim() ? (
+              <>No players match <span className="font-mono">{query}</span>.</>
+            ) : (
+              <>No players found.</>
             )}
+          </div>
+        ) : (
+          <ul>
             {rows.map((p) => {
               const empty = p.entry_count === 0;
               return (
-                <tr
-                  key={p.uuid}
-                  className="border-b border-[var(--color-border)]/60 last:border-b-0 transition-colors hover:bg-[var(--color-panel-2)]"
-                >
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/players/${p.uuid}` as Route}
-                      className="group inline-flex items-center gap-3 font-medium text-[var(--color-fg)] hover:text-[var(--color-accent)]"
-                    >
+                <li key={p.uuid}>
+                  <Link
+                    href={`/players/${p.uuid}` as Route}
+                    className={`grid ${GRID_COLS} items-center gap-4 border-b border-dashed border-[var(--color-rule)] px-4 py-3 text-sm transition last:border-b-0 hover:bg-[var(--color-paper-2)]`}
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
                       <PlayerHead name={p.name} size={28} />
-                      <span>{p.name ?? "(unnamed)"}</span>
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 font-mono text-xs text-[var(--color-fg-muted)]">
-                    {shortUuid(p.uuid)}
-                    <span className="opacity-40">…</span>
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {empty ? (
-                      <Badge variant="default" className="text-[10px]">empty</Badge>
-                    ) : (
-                      <span className="font-mono text-xs text-[var(--color-fg)]">{p.entry_count}</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right text-xs text-[var(--color-fg-muted)]">
-                    {relativeTime(p.updated_at)}
-                  </td>
-                </tr>
+                      <span className="min-w-0 truncate font-medium text-[var(--color-fg)]">
+                        {p.name ?? "(unnamed)"}
+                      </span>
+                    </span>
+                    <span className="font-mono text-xs text-[var(--color-fg-muted)]">
+                      {shortUuid(p.uuid)}
+                      <span className="opacity-40">…</span>
+                    </span>
+                    <span className="text-right">
+                      {empty ? (
+                        <Badge variant="default" className="text-[10px]">empty</Badge>
+                      ) : (
+                        <span className="font-mono text-xs text-[var(--color-fg)]">{p.entry_count}</span>
+                      )}
+                    </span>
+                    <span className="text-right font-mono text-xs text-[var(--color-fg-muted)]">
+                      {relativeTime(p.updated_at)}
+                    </span>
+                  </Link>
+                </li>
               );
             })}
-          </tbody>
-        </table>
+          </ul>
+        )}
       </div>
 
       <div className="text-xs text-[var(--color-fg-muted)]">
