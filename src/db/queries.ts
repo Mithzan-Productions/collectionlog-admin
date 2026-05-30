@@ -159,7 +159,7 @@ export async function grantEntries(
 ): Promise<number> {
   const result = await rawQuery<{ grant_entries: number }>(
     `SELECT grant_entries($1::uuid, $2::text, $3::jsonb) AS grant_entries`,
-    [uuid, NAMESPACE, JSON.stringify(entries)],
+    [uuid, NAMESPACE, entries],
   );
   return result[0]?.grant_entries ?? 0;
 }
@@ -170,7 +170,7 @@ export async function revokeEntries(
 ): Promise<number> {
   const result = await rawQuery<{ revoke_entries: number }>(
     `SELECT revoke_entries($1::uuid, $2::text, $3::jsonb) AS revoke_entries`,
-    [uuid, NAMESPACE, JSON.stringify(entries)],
+    [uuid, NAMESPACE, entries],
   );
   return result[0]?.revoke_entries ?? 0;
 }
