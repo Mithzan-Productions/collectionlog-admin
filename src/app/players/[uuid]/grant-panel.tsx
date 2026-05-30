@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Check,
@@ -49,7 +49,8 @@ type ConfirmKind =
   | { type: "grant"; entries: EntryKey[]; label: string }
   | { type: "grantCollection"; collectionId: string; label: string }
   | { type: "revokeCollection"; collectionId: string; label: string }
-  | { type: "revoke"; entries: EntryKey[]; label: string };
+  | { type: "revoke"; entries: EntryKey[]; label: string }
+  | { type: "revokeBulk"; entries: EntryKey[]; label: string };
 
 export function GrantPanel({
   uuid,
@@ -63,15 +64,21 @@ export function GrantPanel({
   granted: GrantedEntryRow[];
 }) {
   const router = useRouter();
+  // `query` here is the *debounced* query — only updates when SearchInput
+  // commits, never on every keystroke. The input's typing state lives inside
+  // SearchInput so it doesn't cause this parent to re-render.
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchRow[]>([]);
+  // Which query the current `results` were produced for. Prevents the "no
+  // matches" flash on the first render after `query` becomes non-empty but
+  // before the search has actually run.
+  const [resultsFor, setResultsFor] = useState<string>("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [searchPending, startSearch] = useTransition();
   const [mutationPending, startMutation] = useTransition();
   const [toast, setToast] = useState<Toast | null>(null);
   const [confirm, setConfirm] = useState<ConfirmKind | null>(null);
   const [collectionId, setCollectionId] = useState<string>(collections[0]?.identifier ?? "");
-  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Set of currently granted (identifier, collectionId) tuples for badge labeling.
@@ -81,22 +88,22 @@ export function GrantPanel({
     return s;
   }, [holder.entries]);
 
-  // Debounced fuzzy search
+  // Fires only when the debounced query (not the live input) changes.
+  // Request-id guards against a slow in-flight search overwriting newer results.
+  const reqIdRef = useRef(0);
   useEffect(() => {
-    if (searchTimer.current) clearTimeout(searchTimer.current);
     if (!query.trim()) {
       setResults([]);
+      setResultsFor("");
       return;
     }
-    searchTimer.current = setTimeout(() => {
-      startSearch(async () => {
-        const rows = await searchAction(query);
-        setResults(rows);
-      });
-    }, 200);
-    return () => {
-      if (searchTimer.current) clearTimeout(searchTimer.current);
-    };
+    const myId = ++reqIdRef.current;
+    startSearch(async () => {
+      const rows = await searchAction(query);
+      if (myId !== reqIdRef.current) return;
+      setResults(rows);
+      setResultsFor(query);
+    });
   }, [query]);
 
   // Auto-dismiss toast
@@ -109,14 +116,15 @@ export function GrantPanel({
     };
   }, [toast]);
 
-  const toggle = (k: string) => {
+  // Stable callback so memoized ResultRow doesn't re-render on every keystroke
+  const toggle = useCallback((k: string) => {
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(k)) next.delete(k);
       else next.add(k);
       return next;
     });
-  };
+  }, []);
 
   const selectAll = () => {
     setSelected(new Set(results.map((r) => keyOf(r))));
@@ -135,6 +143,15 @@ export function GrantPanel({
     if (selectedEntries.length === 0) return;
     setConfirm({
       type: "grant",
+      entries: selectedEntries,
+      label: `${selectedEntries.length} entr${selectedEntries.length === 1 ? "y" : "ies"}`,
+    });
+  };
+
+  const askRevokeSelected = () => {
+    if (selectedEntries.length === 0) return;
+    setConfirm({
+      type: "revokeBulk",
       entries: selectedEntries,
       label: `${selectedEntries.length} entr${selectedEntries.length === 1 ? "y" : "ies"}`,
     });
@@ -201,6 +218,14 @@ export function GrantPanel({
                 }
               : { kind: "info", message: `Nothing to revoke from ${c.label}.` },
           );
+        } else if (c.type === "revokeBulk") {
+          const { revoked } = await revokeAction(uuid, c.entries);
+          setToast(
+            revoked > 0
+              ? { kind: "success", message: `Revoked ${revoked} entr${revoked === 1 ? "y" : "ies"}.` }
+              : { kind: "info", message: "Nothing to revoke — none of the selected entries were on the holder." },
+          );
+          if (revoked > 0) clearSelection();
         } else if (c.type === "revoke") {
           const { revoked } = await revokeAction(uuid, c.entries);
           setToast(
@@ -247,18 +272,7 @@ export function GrantPanel({
           </div>
         </div>
 
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-fg-muted)]" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type to search the catalog (e.g. “halo”, “reaper”)…"
-            className="pl-9"
-          />
-          {searchPending && (
-            <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[var(--color-fg-muted)]" />
-          )}
-        </div>
+        <SearchInput onCommit={setQuery} pending={searchPending} />
 
         {results.length > 0 && (
           <div className="flex items-center justify-between gap-2 text-xs">
@@ -283,48 +297,35 @@ export function GrantPanel({
               const already = grantedKeys.has(`${r.identifier}::${r.collection_id}`);
               const checked = selected.has(k);
               return (
-                <label
+                <ResultRow
                   key={k}
-                  className={
-                    "flex cursor-pointer items-center gap-3 px-3 py-2 text-sm transition-colors " +
-                    (checked ? "bg-[var(--color-accent)]/10" : "hover:bg-[var(--color-panel-2)]")
-                  }
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggle(k)}
-                    className="h-4 w-4 cursor-pointer accent-[var(--color-accent)]"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate font-medium">
-                      <ColoredText raw={r.display_name_raw} fallback={r.display_name_plain} />
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">
-                      <span className="truncate">{r.collection_id}</span>
-                      <span className="opacity-40">·</span>
-                      <span className="truncate font-mono">{r.identifier}</span>
-                    </div>
-                  </div>
-                  {already && (
-                    <Badge variant="success" className="shrink-0 gap-1">
-                      <Check className="h-3 w-3" />
-                      granted
-                    </Badge>
-                  )}
-                </label>
+                  row={r}
+                  rowKey={k}
+                  checked={checked}
+                  already={already}
+                  onToggle={toggle}
+                />
               );
             })}
           </div>
         )}
 
-        {query.trim() && results.length === 0 && !searchPending && (
+        {query.trim() && resultsFor === query && results.length === 0 && !searchPending && (
           <div className="rounded border border-dashed bg-[var(--color-bg)] px-4 py-6 text-center text-xs text-[var(--color-fg-muted)]">
             No catalog matches for <span className="font-mono">{query}</span>.
           </div>
         )}
 
         <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="danger"
+            disabled={selectedEntries.length === 0 || mutationPending}
+            onClick={askRevokeSelected}
+            className="gap-1.5"
+          >
+            <Trash2 className="h-4 w-4" />
+            Revoke selected
+          </Button>
           <Button
             disabled={selectedEntries.length === 0 || mutationPending}
             onClick={askGrantSelected}
@@ -437,61 +438,69 @@ export function GrantPanel({
             role="dialog"
             aria-modal="true"
           >
-            <h2 className="mb-1 text-base font-semibold">
-              {confirm.type === "revoke" || confirm.type === "revokeCollection"
-                ? "Confirm revoke"
-                : "Confirm grant"}
-            </h2>
-            <p className="mb-5 text-sm text-[var(--color-fg-muted)]">
-              {confirm.type === "grant" && (
+            {(() => {
+              const isRevoke =
+                confirm.type === "revoke" ||
+                confirm.type === "revokeBulk" ||
+                confirm.type === "revokeCollection";
+              return (
                 <>
-                  About to grant <span className="font-mono text-[var(--color-fg)]">{confirm.label}</span> to{" "}
-                  <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
+                  <h2 className="mb-1 text-base font-semibold">
+                    {isRevoke ? "Confirm revoke" : "Confirm grant"}
+                  </h2>
+                  <p className="mb-5 text-sm text-[var(--color-fg-muted)]">
+                    {confirm.type === "grant" && (
+                      <>
+                        About to grant <span className="font-mono text-[var(--color-fg)]">{confirm.label}</span> to{" "}
+                        <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
+                      </>
+                    )}
+                    {confirm.type === "grantCollection" && (
+                      <>
+                        About to grant every entry in <span className="font-medium text-[var(--color-fg)]">{confirm.label}</span>{" "}
+                        to <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
+                      </>
+                    )}
+                    {confirm.type === "revokeCollection" && (
+                      <>
+                        About to revoke every entry in <span className="font-medium text-[var(--color-fg)]">{confirm.label}</span>{" "}
+                        from <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
+                      </>
+                    )}
+                    {confirm.type === "revokeBulk" && (
+                      <>
+                        About to revoke <span className="font-mono text-[var(--color-fg)]">{confirm.label}</span> from{" "}
+                        <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Entries not actually on the holder will be skipped. Continue?
+                      </>
+                    )}
+                    {confirm.type === "revoke" && (
+                      <>
+                        About to revoke <span className="font-medium text-[var(--color-fg)]">{confirm.label}</span> from{" "}
+                        <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
+                      </>
+                    )}
+                  </p>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="secondary"
+                      disabled={mutationPending}
+                      onClick={() => setConfirm(null)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant={isRevoke ? "danger" : "default"}
+                      disabled={mutationPending}
+                      onClick={runConfirmed}
+                      className="gap-1.5"
+                    >
+                      {mutationPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {isRevoke ? "Revoke" : "Grant"}
+                    </Button>
+                  </div>
                 </>
-              )}
-              {confirm.type === "grantCollection" && (
-                <>
-                  About to grant every entry in <span className="font-medium text-[var(--color-fg)]">{confirm.label}</span>{" "}
-                  to <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
-                </>
-              )}
-              {confirm.type === "revokeCollection" && (
-                <>
-                  About to revoke every entry in <span className="font-medium text-[var(--color-fg)]">{confirm.label}</span>{" "}
-                  from <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
-                </>
-              )}
-              {confirm.type === "revoke" && (
-                <>
-                  About to revoke <span className="font-medium text-[var(--color-fg)]">{confirm.label}</span> from{" "}
-                  <span className="font-medium text-[var(--color-fg)]">{holder.name}</span>. Continue?
-                </>
-              )}
-            </p>
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="secondary"
-                disabled={mutationPending}
-                onClick={() => setConfirm(null)}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant={
-                  confirm.type === "revoke" || confirm.type === "revokeCollection"
-                    ? "danger"
-                    : "default"
-                }
-                disabled={mutationPending}
-                onClick={runConfirmed}
-                className="gap-1.5"
-              >
-                {mutationPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {confirm.type === "revoke" || confirm.type === "revokeCollection"
-                  ? "Revoke"
-                  : "Grant"}
-              </Button>
-            </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -654,3 +663,92 @@ function CollectionCombobox({
     </div>
   );
 }
+
+// ─── Isolated search input ───────────────────────────────────────────────────
+// Owns its own typing state so keystrokes don't re-render the parent GrantPanel
+// (which has a heavy result list, granted list, modals, etc.). Only commits the
+// debounced value upward, eliminating the per-keystroke cascade.
+const SearchInput = memo(function SearchInput({
+  onCommit,
+  pending,
+  debounceMs = 300,
+}: {
+  onCommit: (q: string) => void;
+  pending: boolean;
+  debounceMs?: number;
+}) {
+  const [value, setValue] = useState("");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      onCommit(value);
+    }, debounceMs);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [value, onCommit, debounceMs]);
+
+  return (
+    <div className="relative">
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-fg-muted)]" />
+      <Input
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="Type to search the catalog (e.g. “halo”, “reaper”)…"
+        className="pl-9"
+      />
+      {pending && (
+        <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-[var(--color-fg-muted)]" />
+      )}
+    </div>
+  );
+});
+
+// ─── Memoized search result row (so keystrokes don't re-render the list) ─────
+const ResultRow = memo(function ResultRow({
+  row,
+  rowKey,
+  checked,
+  already,
+  onToggle,
+}: {
+  row: SearchRow;
+  rowKey: string;
+  checked: boolean;
+  already: boolean;
+  onToggle: (k: string) => void;
+}) {
+  return (
+    <label
+      className={
+        "flex cursor-pointer items-center gap-3 px-3 py-2 text-sm transition-colors " +
+        (checked ? "bg-[var(--color-accent)]/10" : "hover:bg-[var(--color-panel-2)]")
+      }
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={() => onToggle(rowKey)}
+        className="h-4 w-4 cursor-pointer accent-[var(--color-accent)]"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium">
+          <ColoredText raw={row.display_name_raw} fallback={row.display_name_plain} />
+        </div>
+        <div className="flex items-center gap-2 text-xs text-[var(--color-fg-muted)]">
+          <span className="truncate">{row.collection_id}</span>
+          <span className="opacity-40">·</span>
+          <span className="truncate font-mono">{row.identifier}</span>
+        </div>
+      </div>
+      {already && (
+        <Badge variant="success" className="shrink-0 gap-1">
+          <Check className="h-3 w-3" />
+          granted
+        </Badge>
+      )}
+    </label>
+  );
+});
