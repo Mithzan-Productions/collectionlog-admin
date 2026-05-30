@@ -79,8 +79,10 @@ CREATE TRIGGER collection_definitions_history_trigger
   EXECUTE FUNCTION snapshot_collection_history();
 
 -- ─── drop the placeholder tables from 0001_init.sql ─────────────────────────
--- They were created as IF NOT EXISTS but never populated. Safe to drop.
+-- Re-runs: 0003 may have already replaced catalog_entries with a matview.
+DROP MATERIALIZED VIEW IF EXISTS catalog_entries CASCADE;
 DROP TABLE IF EXISTS catalog_entries CASCADE;
+DROP VIEW IF EXISTS catalog_collections CASCADE;
 DROP TABLE IF EXISTS catalog_collections CASCADE;
 
 -- ─── catalog_collections: regular view ──────────────────────────────────────

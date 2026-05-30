@@ -41,6 +41,7 @@ export const catalogEntries = pgTable(
     displayNameRaw: text("display_name_raw"),
     material: text("material"),
     menuWeight: integer("menu_weight"),
+    entryJson: jsonb("entry_json"),
     searchText: text("search_text").notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

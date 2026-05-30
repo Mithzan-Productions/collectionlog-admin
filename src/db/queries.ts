@@ -4,6 +4,20 @@
 import { db, rawQuery, NAMESPACE } from "./client";
 import { catalogCollections, catalogEntries, playerData, type LogHolder } from "./schema";
 import { eq, asc } from "drizzle-orm";
+import {
+  formatEntryLabelPlain,
+  type CatalogEntryJson,
+} from "@/lib/item-detail";
+
+/** Apply ItemParser-style metadata labels to a catalog row. */
+export function withEntryLabel<T extends Record<string, unknown>>(row: T): T {
+  const entry = (row.entry_json ?? row.entryJson) as CatalogEntryJson | undefined;
+  if (!entry || typeof entry !== "object") return row;
+  const plain = formatEntryLabelPlain(entry);
+  if ("display_name_plain" in row) return { ...row, display_name_plain: plain };
+  if ("displayNamePlain" in row) return { ...row, displayNamePlain: plain };
+  return row;
+}
 
 // ─── catalog ─────────────────────────────────────────────────────────────────
 export async function listCollections() {
@@ -74,11 +88,12 @@ export async function getCollection(id: string) {
 }
 
 export async function listEntriesForCollection(collectionId: string) {
-  return db
+  const rows = await db
     .select()
     .from(catalogEntries)
     .where(eq(catalogEntries.collectionId, collectionId))
     .orderBy(asc(catalogEntries.menuWeight));
+  return rows.map((r) => withEntryLabel(r));
 }
 
 /**
@@ -95,9 +110,10 @@ export async function searchEntries(query: string, limit = 50) {
     display_name_plain: string;
     display_name_raw: string | null;
     material: string | null;
+    entry_json: CatalogEntryJson;
     score: number;
   }>(
-    `SELECT identifier, collection_id, display_name_plain, display_name_raw, material,
+    `SELECT identifier, collection_id, display_name_plain, display_name_raw, material, entry_json,
             GREATEST(
               word_similarity($1, search_text),
               CASE WHEN search_text ILIKE '%' || $1 || '%' THEN 1.0 ELSE 0 END
@@ -109,7 +125,7 @@ export async function searchEntries(query: string, limit = 50) {
       LIMIT $2`,
     [q, limit],
   );
-  return rows;
+  return rows.map((r) => withEntryLabel(r));
 }
 
 // ─── players ─────────────────────────────────────────────────────────────────
@@ -263,6 +279,7 @@ export async function listGrantedEntries(uuid: string): Promise<GrantedEntryRow[
             g.collection_id,
             e.display_name_plain,
             e.display_name_raw,
+            e.entry_json,
             c.display_name_plain AS collection_display_plain,
             c.display_name_raw   AS collection_display_raw,
             g.ts
@@ -274,7 +291,7 @@ export async function listGrantedEntries(uuid: string): Promise<GrantedEntryRow[
                g.identifier ASC`,
     [ns, uuid],
   );
-  return rows;
+  return rows.map((r) => withEntryLabel(r));
 }
 
 /**
